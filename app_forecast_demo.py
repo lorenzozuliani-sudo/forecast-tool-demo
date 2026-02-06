@@ -172,13 +172,13 @@ st.title("📈 Simulatore Business & Forecasting")
 
 with st.expander("ℹ️ Guida Rapida: Cosa fa questo strumento?"):
     st.markdown("""
-    Questo strumento è un **CFO Virtuale e Simulatore Strategico** progettato per e-commerce.
+    Questo strumento è un **CFO Virtuale e Simulatore Strategico** progettato per e-commerce. Non si limita a visualizzare i dati passati, ma ti aiuta a pianificare il futuro economico.
     
     **A cosa serve:**
-    1.  **💰 Controllo Profittabilità:** Calcola il Break-Even ROAS e il Profitto reale.
-    2.  **🔮 Forecasting:** Simula scenari futuri basandosi sui dati storici.
-    3.  **⚖️ Analisi Efficienza:** Analizza la saturazione della spesa pubblicitaria.
-    4.  **🧠 Intelligence Automatica:** Analisi automatica di Retention, Sconti e Canali.
+    1.  **💰 Controllo Profittabilità (Business Economics):** Inserendo i tuoi margini nella colonna di sinistra, il tool calcola il *Break-Even ROAS* (il punto di pareggio) e ti dice se stai realmente guadagnando o se stai solo "muovendo soldi".
+    2.  **🔮 Forecasting (Previsione):** Ti permette di simulare scenari futuri ("Cosa succede se raddoppio il budget su Meta?"). Usa i dati storici e la stagionalità per proiettare fatturato e costi.
+    3.  **⚖️ Analisi Efficienza (Saturazione):** Ti aiuta a capire se aumentando la spesa pubblicitaria il fatturato cresce di pari passo (alta elasticità) o se stai saturando il pubblico (bassa efficienza).
+    4.  **🧠 Intelligence Automatica (AI):** Un algoritmo analizza la qualità del business (Retention, Sconti, Canali) e ti dà un punteggio di salute mensile.
     """)
 
 # --- SIDEBAR: BUSINESS ECONOMICS ---
