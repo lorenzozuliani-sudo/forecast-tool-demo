@@ -11,22 +11,31 @@ st.set_page_config(page_title="Forecasting Strategico Pro - DEMO", layout="wide"
 # STILE CSS PROFESSIONALE
 st.markdown("""
     <style>
+    /* 1. STILI BASE (LIGHT MODE) */
     .main { background-color: #f8f9fa; }
     .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e6e6e6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     div[data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; border: 1px solid #e1e4e8; }
     h1, h2, h3 { color: #2c3e50; }
-    div[data-testid="stMarkdownContainer"] p { font-size: 0.95rem; }
-    div.stButton > button { width: 100%; border-radius: 5px; }
-    
-    /* Stile personalizzato per Tab AI */
-    .ai-box { padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
+    .ai-box { padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e0e0e0; color: #1e1e1e; }
     .ai-score-high { background-color: #f0fff4; border-left: 5px solid #48bb78; }
     .ai-score-med { background-color: #fffaf0; border-left: 5px solid #ed8936; }
     .ai-score-low { background-color: #fff5f5; border-left: 5px solid #f56565; }
-    .ai-title { font-weight: bold; font-size: 1.1em; margin-bottom: 10px; display: flex; justify-content: space-between; }
+    .ai-alert { background-color: #fff5f5; color: #c53030; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.85em; border: 1px solid #feb2b2; }
     .ai-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-right: 5px; background-color: #e2e8f0; color: #4a5568; }
-    .tag-blue { background-color: #ebf8ff; color: #2b6cb0; }
-    .tag-retention { background-color: #f0fdf4; color: #15803d; }
+
+    /* 2. ADATTAMENTO PER DARK MODE (MAC/SYSTEM) */
+    @media (prefers-color-scheme: dark) {
+        .main { background-color: #0e1117; }
+        .stMetric, div[data-testid="stExpander"] { background-color: #262730; border: 1px solid #464855; color: #ffffff; }
+        h1, h2, h3 { color: #ffffff !important; }
+        .ai-box { background-color: #1e1e1e; border-color: #464855; color: #ffffff; }
+        /* Varianti colori AI per Dark Mode per mantenere leggibilità */
+        .ai-score-high { background-color: #1a2e23; border-left: 5px solid #48bb78; }
+        .ai-score-med { background-color: #2d261e; border-left: 5px solid #ed8936; }
+        .ai-score-low { background-color: #2d1e1e; border-left: 5px solid #f56565; }
+        .ai-alert { background-color: #442a2a; color: #ff8080; border-color: #663333; }
+        .ai-tag { background-color: #313d4f; color: #e2e8f0; }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -187,7 +196,7 @@ with st.sidebar.expander("1. Input Metriche", expanded=True):
     # INPUT UTENTE
     be_aov = st.number_input(
         "Average Order Value (€)", 
-        value=122.0, step=1.0,
+        value=145.0, step=1.0,
         help="Il valore medio del carrello (Lordo). Corrisponde al prezzo pagato dal cliente alla cassa."
     )
     
@@ -205,7 +214,7 @@ with st.sidebar.expander("1. Input Metriche", expanded=True):
     
     be_margin_prod = st.number_input(
         "Gross Margin (%)", 
-        value=30.0, step=5.0,
+        value=45.0, step=5.0,
         help="Margine lordo sul prodotto dopo il costo del venduto (COGS). Esempio: Vendi a 100€, ti costa 70€ produrlo -> Margine 30%."
     )
     
@@ -362,6 +371,8 @@ if df is not None:
 
         df['Fatturato_Netto'] = df[col_sales].clip(lower=0)
         df['Spesa_Ads_Totale'] = df[col_google] + df[col_meta]
+        df['Spesa_Ads_Totale'] = df['Spesa_Ads_Totale'].replace(0, np.nan)
+        df['MER'] = (df[col_sales] / df['Spesa_Ads_Totale']).fillna(0)
         df['Tasso_Resi'] = (df[col_returns].abs() / df[col_sales].replace(0, np.nan)) * 100
         df['Tasso_Resi'] = df['Tasso_Resi'].fillna(0)
         
@@ -456,8 +467,7 @@ if df is not None:
                 for hist_row in historical_growth_data[:4]: st.markdown(hist_row)
 
         st.sidebar.markdown(f"**Crescita Rilevata (YoY):** `{growth_rate:+.1%}`.")
-        manual_trend = st.sidebar.slider("Aggiusta Trend Futuro", -0.5, 2.0, key="trend_val", help="Aggiunge o toglie punti percentuali al trend storico rilevato.")
-
+        manual_trend = st.sidebar.slider("Aggiusta Trend Futuro", -0.5, 2.0, value=st.session_state.trend_val, key="trend_val", help="...")
         st.sidebar.divider()
         st.sidebar.subheader("Scenari Budget")
         st.sidebar.markdown("""
@@ -465,8 +475,9 @@ if df is not None:
         * **1.0**: Spesa standard (uguale agli anni passati).
         * **2.0**: Simula cosa succede se raddoppi l'investimento.
         """)        
-        m_google = st.sidebar.slider("Scala Google Ads", 0.5, 5.0, key="google_scale")
-        m_meta = st.sidebar.slider("Scala Meta Ads", 0.5, 5.0, key="meta_scale")
+        # Usiamo il valore dello stato per rendere lo slider "intelligente"
+        m_google = st.sidebar.slider("🚀 Google Ads Budget Scale", 0.5, 3.0, value=st.session_state.google_scale, key="google_scale")
+        m_meta = st.sidebar.slider("🚀 Meta Ads Budget Scale", 0.5, 3.0, value=st.session_state.meta_scale, key="meta_scale")
         
         st.sidebar.divider()
         # Titolo della sezione
@@ -543,8 +554,16 @@ if df is not None:
             proj_meta_base = base[col_meta].values[0] * base_trend
             
             new_g, new_m = proj_google_base * m_google, proj_meta_base * m_meta
-            ratio = (new_g + new_m) / (proj_google_base + proj_meta_base) if (proj_google_base + proj_meta_base) > 0 else 1.0
-            f_sales = proj_sales_base * (ratio ** sat_factor)
+            total_new_spend = new_g + new_m
+            total_base_spend = proj_google_base + proj_meta_base
+            
+            # Modello Esponenziale: raddoppiare la spesa non raddoppia i risultati
+            spend_ratio = total_new_spend / total_base_spend if total_base_spend > 0 else 1.0
+            saturation_effect = 1 - np.exp(-sat_factor * spend_ratio)
+            # Normalizzazione per mantenere la coerenza con la baseline
+            efficiency_boost = saturation_effect / (1 - np.exp(-sat_factor)) if sat_factor > 0 else 1.0
+            
+            f_sales = proj_sales_base * efficiency_boost
             
             f_orders = f_sales / be_aov
             
@@ -568,7 +587,7 @@ if df is not None:
         tabs = st.tabs([
             "📉 Grafico Previsionale", "📋 Dettaglio Previsione", "🔵 Analisi Google Ads", 
             "🔵 Analisi Meta Ads", "🧪 Analisi Saturazione Storica", "📊 Analisi Resi", 
-            "🗂️ Dati CSV", "🧠 Insight AI"
+            "🗂️ Dati CSV", "🧠 Insight AI", "🎯 Ottimizzazione", "🏥 Health Check"
         ])
         
         # COLORI
@@ -668,10 +687,10 @@ if df is not None:
                 
                 all_weeks = pd.DataFrame({'Week': range(1, 54)})
                 df_curr = df[df['Year'] == curr_year_sel][['Week', 'Spesa_Ads_Totale', 'Fatturato_Netto', 'Periodo']]
-                df_prev = df[df['Year'] == prev_year_sel][['Week', 'Spesa_Ads_Totale', 'Fatturato_Netto']]
+                df_hist_prev = df[df['Year'] == prev_year_sel][['Week', 'Spesa_Ads_Totale', 'Fatturato_Netto']]
                 
                 df_comp = pd.merge(all_weeks, df_curr, on='Week', how='left')
-                df_comp = pd.merge(df_comp, df_prev, on='Week', suffixes=('_Curr', '_Prev'), how='left').fillna(0)
+                df_comp = pd.merge(df_comp, df_hist_prev, on='Week', suffixes=('_Curr', '_Prev'), how='left').fillna(0)
                 
                 df_comp['Delta Spesa %'] = np.where(df_comp['Spesa_Ads_Totale_Prev'] > 0, ((df_comp['Spesa_Ads_Totale_Curr'] - df_comp['Spesa_Ads_Totale_Prev']) / df_comp['Spesa_Ads_Totale_Prev']) * 100, 0)
                 df_comp['Delta Ricavi %'] = np.where(df_comp['Fatturato_Netto_Prev'] > 0, ((df_comp['Fatturato_Netto_Curr'] - df_comp['Fatturato_Netto_Prev']) / df_comp['Fatturato_Netto_Prev']) * 100, 0)
@@ -782,6 +801,142 @@ if df is not None:
                         {''.join([f'<div class="ai-alert">⚠️ {a}</div>' for a in alerts])}
                     </div>
                     """, unsafe_allow_html=True)
+
+        with tabs[8]:
+            st.header("🎯 Strategia di Scalabilità Safe")
+            st.subheader("Pianificazione Budget Ads per il Prossimo Mese")
+            
+            # Calcolo dei dati per il prossimo mese (4 settimane)
+            # Usiamo df_prev che ora contiene correttamente le previsioni future
+            next_4_weeks = df_prev.head(4)
+            next_month_sales = df_prev.head(4)['Fatturato Previsto'].sum()
+            
+            # Budget Massimo = Fatturato stimato / ROAS di Pareggio
+            max_safe_budget = next_month_sales / be_roas_val
+            
+            # Calcolo MER medio dell'ultimo mese storico per il semaforo
+            mer_attuale = df['MER'].tail(4).mean()
+
+            col_opt1, col_opt2 = st.columns(2)
+            
+            with col_opt1:
+                st.markdown(f"### ⚖️ Punto di Pareggio Reale\nIl tuo **Break-Even ROAS è {be_roas_val:.2f}**.")
+                st.metric(
+                    "💰 Budget Totale Max Sostenibile", 
+                    f"€ {max_safe_budget:,.0f}", 
+                    help="Questa è la spesa Ads totale (Google + Meta) massima per le prossime 4 settimane per non chiudere il mese in perdita operativa."
+                )
+
+            with col_opt2:
+                st.markdown("### 🚀 Roadmap Strategica")
+                # Il semaforo si basa sulle performance attuali rispetto al limite di pareggio
+                if mer_attuale > be_roas_val * 1.2:
+                    st.success(f"✅ **Semaforo Verde:** Hai un'ottima marginalità (MER {mer_attuale:.2f}). Puoi aumentare il budget Ads totale del 15-20% per le prossime settimane.")
+                elif mer_attuale >= be_roas_val:
+                    st.warning(f"⚠️ **Semaforo Giallo:** Sei vicino al break-even (MER {mer_attuale:.2f}). Scala il budget solo se riesci ad aumentare l'AOV o migliorare il Conversion Rate.")
+                else:
+                    st.error(f"🚨 **Semaforo Rosso:** Attualmente sei sotto soglia (MER {mer_attuale:.2f}). Non aumentare il budget! Rischieresti di scalare le perdite.")
+
+            st.divider()
+            
+            # Simulatore di Scenario Target
+            st.subheader("🔮 Simulatore: Obiettivo Profitto Netto")
+            st.write("Imposta quanto vuoi guadagnare 'pulito' e ti dirò quanto puoi permetterti di spendere in Ads.")
+            
+            target_profit = st.slider(
+                "Profitto desiderato per il prossimo mese (€)", 
+                0, int(next_month_sales/2), 5000,
+                help="Profitto operativo dopo aver pagato Tasse, Merce, Logistica e Pubblicità."
+            )
+            
+            # Budget Target = Budget di Pareggio - Profitto Desiderato
+            target_budget = max_safe_budget - target_profit
+            needed_mer = next_month_sales / target_budget if target_budget > 0 else 0
+            
+            if target_budget > 0:
+                st.info(f"""
+                Per incassare **€ {target_profit:,.0f}** di profitto netto il prossimo mese:
+                1. La tua spesa Ads totale (Google+Meta) deve essere di circa **€ {target_budget:,.0f}**.
+                2. Devi mantenere un **MER minimo di {needed_mer:.2f}**.
+                """)
+            else:
+                st.error("Il profitto richiesto è troppo alto rispetto al fatturato previsto. Riduci l'obiettivo o aumenta i margini.")      
+     
+        with tabs[9]:
+            st.header("🏥 Stato di Salute del Progetto (YoY)")
+            
+            years_avail = sorted(df['Year'].unique(), reverse=True)
+            if len(years_avail) < 2:
+                st.warning("Dati insufficienti per un confronto YoY.")
+            else:
+                col_f1, col_f2 = st.columns(2)
+                year_target = col_f1.selectbox("Anno", years_avail, index=0, key="year_t_9")
+                year_comp = col_f2.selectbox("Confronta con", years_avail, index=min(1, len(years_avail)-1), key="year_c_9")
+
+                def get_y_metrics(year):
+                    d = df[df['Year'] == year].copy()
+                    sales = d['Fatturato_Netto'].sum()
+                    spend = d['Spesa_Ads_Totale'].sum()
+                    orders = d['Orders'].sum() if 'Orders' in d.columns else (sales / be_aov)
+                    
+                    # Pulizia Returning Customer Rate (dal tuo CSV Euterpe)
+                    if 'Returning customer rate' in d.columns:
+                        ret_values = d['Returning customer rate'].astype(str).str.replace('%', '').str.strip()
+                        ret_mean = pd.to_numeric(ret_values, errors='coerce').mean()
+                    else:
+                        ret_mean = 0
+
+                    return {
+                        'sales': sales,
+                        'mer': sales / spend if spend > 0 else 0,
+                        'cpa': spend / orders if orders > 0 else 0,
+                        'cpc': d['CPC_Medio'].mean() if 'CPC_Medio' in d.columns else 0,
+                        'aov': sales / orders if orders > 0 else 0,
+                        'returns': (d['Returns'].abs().sum() / sales * 100) if sales > 0 else 0,
+                        'ret': ret_mean
+                    }
+
+                mt = get_y_metrics(year_target)
+                mc = get_y_metrics(year_comp)
+
+                # PRIMA RIGA KPI
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    delta_sales = ((mt['sales'] - mc['sales']) / mc['sales'] * 100) if mc['sales'] > 0 else 0
+                    st.metric("Fatturato", f"€ {mt['sales']:,.0f}", f"{delta_sales:+.1f}%")
+                with c2:
+                    delta_mer = ((mt['mer'] - mc['mer']) / mc['mer'] * 100) if mc['mer'] > 0 else 0
+                    st.metric("ROAS (MER)", f"{mt['mer']:.2f}", f"{delta_mer:+.1f}%")
+                with c3:
+                    delta_cpa = ((mt['cpa'] - mc['cpa']) / mc['cpa'] * 100) if mc['cpa'] > 0 else 0
+                    st.metric("CPA Medio", f"€ {mt['cpa']:.2f}", f"{delta_cpa:+.1f}%", delta_color="inverse")
+                with c4:
+                    delta_cpc = ((mt['cpc'] - mc['cpc']) / mc['cpc'] * 100) if mc['cpc'] > 0 else 0
+                    st.metric("CPC Medio", f"€ {mt['cpc']:.2f}", f"{delta_cpc:+.1f}%", delta_color="inverse")
+
+                st.divider()
+
+                # SECONDA RIGA KPI (Qui c'era l'errore: ora definiamo c5, c6, c7, c8)
+                c5, c6, c7, c8 = st.columns(4)
+                with c5:
+                    delta_aov = ((mt['aov'] - mc['aov']) / mc['aov'] * 100) if mc['aov'] > 0 else 0
+                    st.metric("Carrello Medio (AOV)", f"€ {mt['aov']:.2f}", f"{delta_aov:+.1f}%")
+                with c6:
+                    delta_res = mt['returns'] - mc['returns']
+                    st.metric("Tasso Resi (%)", f"{mt['returns']:.1f}%", f"{delta_res:+.1f}% (pt)", delta_color="inverse")
+                with c7:
+                    delta_ret = mt['ret'] - mc['ret']
+                    st.metric("Returning Customer %", f"{mt['ret']:.2f}%", f"{delta_ret:+.2f}% (pt)")
+                with c8:
+                    status = "🟢 SANO" if mt['mer'] > be_roas_val else "🔴 CRITICO"
+                    st.metric("Status Progetto", status)
+
+                # Grafico
+                st.subheader(f"Confronto Mensile: {year_target} vs {year_comp}")
+                df_yoy = df[df['Year'].isin([year_target, year_comp])].copy()
+                df_yoy['Mese'] = df_yoy['Data_Interna'].dt.month
+                yoy_chart = df_yoy.groupby(['Year', 'Mese'])['Fatturato_Netto'].sum().unstack(level=0)
+                st.bar_chart(yoy_chart)
 
     except Exception as e:
         st.error(f"⚠️ Errore: {e}")
