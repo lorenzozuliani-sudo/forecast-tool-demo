@@ -469,10 +469,13 @@ if df is not None:
         m_meta = st.sidebar.slider("Scala Meta Ads", 0.5, 5.0, key="meta_scale")
         
         st.sidebar.divider()
-        st.sidebar.subheader("Calibrazione")
+        # Titolo della sezione
         st.sidebar.subheader("🧪 Calibrazione")
+        
+        # Lo slider deve apparire UNA sola volta
         sat_factor = st.sidebar.slider("Saturazione", 0.5, 1.0, key="sat_val")
 
+        # L'expander contiene solo la documentazione
         with st.sidebar.expander("ℹ️ Come viene calcolato?"):
             st.markdown("""
             Modella i **rendimenti decrescenti**: spiega al simulatore quanto cala l'efficacia delle Ads all'aumentare del budget.
@@ -482,9 +485,7 @@ if df is not None:
             * **0.70 (Competitivo):** Mercato saturo o molto competitivo. Grandi incrementi di budget portano a piccoli incrementi di fatturato.
             
             > **Suggerimento:** Se hai un ROAS molto alto ora, puoi stare verso 0.90. Se sei già al limite della profittabilità, usa 0.75 per sicurezza.
-            """)        
-        sat_factor = st.sidebar.slider("Saturazione", 0.5, 1.0, key="sat_val")
-        
+            """)
         # Grafico Saturazione con Assi
         x_sat = np.linspace(1, 4, 20)
         y_sat = x_sat ** sat_factor
