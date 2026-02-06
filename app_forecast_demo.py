@@ -460,28 +460,15 @@ if df is not None:
 
         st.sidebar.divider()
         st.sidebar.subheader("Scenari Budget")
-        st.sidebar.markdown("""
         **Scala Budget:** Moltiplica la spesa storica media per questo fattore.
         * **1.0**: Spesa standard (uguale agli anni passati).
         * **2.0**: Simula cosa succede se raddoppi l'investimento.
-        """)    
+        """)        
         m_google = st.sidebar.slider("Scala Google Ads", 0.5, 5.0, key="google_scale")
         m_meta = st.sidebar.slider("Scala Meta Ads", 0.5, 5.0, key="meta_scale")
         
         st.sidebar.divider()
-        st.sidebar.subheader("🧪 Calibrazione")
-        sat_factor = st.sidebar.slider("Saturazione", 0.5, 1.0, key="sat_val")
-
-        with st.sidebar.expander("ℹ️ Come viene calcolato?"):
-            st.markdown("""
-            Modella i **rendimenti decrescenti**: spiega al simulatore quanto cala l'efficacia delle Ads all'aumentare del budget.
-            
-            * **1.0 (Lineare):** Caso teorico. Raddoppi il budget = raddoppi le vendite. Poco realistico per scale elevate.
-            * **0.85 (Realistico):** Valore consigliato. Tiene conto che scalando il pubblico, il costo per acquisizione (CPA) tende a salire leggermente.
-            * **0.70 (Competitivo):** Mercato saturo o molto competitivo. Grandi incrementi di budget portano a piccoli incrementi di fatturato.
-            
-            > **Suggerimento:** Se hai un ROAS molto alto ora, puoi stare verso 0.90. Se sei già al limite della profittabilità, usa 0.75 per sicurezza.
-            """)
+        st.sidebar.subheader("Calibrazione")
         sat_factor = st.sidebar.slider("Saturazione", 0.5, 1.0, key="sat_val")
         
         # Grafico Saturazione con Assi
