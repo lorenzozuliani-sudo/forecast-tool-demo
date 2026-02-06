@@ -278,7 +278,7 @@ demo_mode = st.sidebar.toggle("🚀 Usa Modalità DEMO (Dati Casuali)", value=Fa
 
 uploaded_file = None
 if not demo_mode:
-    uploaded_file = st.sidebar.file_uploader("Carica il file META_GOOGLE_SHOPIFY.csv", type="csv")
+    uploaded_file = st.sidebar.file_uploader("Carica il file .csv", type="csv")
 
 # --- GUIDA FORMATO CSV ---
 with st.expander("📋 Guida: Come formattare il CSV per la versione completa"):
