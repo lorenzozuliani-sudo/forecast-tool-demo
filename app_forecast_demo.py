@@ -460,11 +460,11 @@ if df is not None:
 
         st.sidebar.divider()
         st.sidebar.subheader("Scenari Budget")
-        ("""
+        st.sidebar.markdown("""
         **Scala Budget:** Moltiplica la spesa storica media per questo fattore.
         * **1.0**: Spesa standard (uguale agli anni passati).
         * **2.0**: Simula cosa succede se raddoppi l'investimento.
-        """)       
+        """)    
         m_google = st.sidebar.slider("Scala Google Ads", 0.5, 5.0, key="google_scale")
         m_meta = st.sidebar.slider("Scala Meta Ads", 0.5, 5.0, key="meta_scale")
         
