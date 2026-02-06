@@ -470,6 +470,19 @@ if df is not None:
         
         st.sidebar.divider()
         st.sidebar.subheader("Calibrazione")
+        st.sidebar.subheader("🧪 Calibrazione")
+        sat_factor = st.sidebar.slider("Saturazione", 0.5, 1.0, key="sat_val")
+
+        with st.sidebar.expander("ℹ️ Come viene calcolato?"):
+            st.markdown("""
+            Modella i **rendimenti decrescenti**: spiega al simulatore quanto cala l'efficacia delle Ads all'aumentare del budget.
+            
+            * **1.0 (Lineare):** Caso teorico. Raddoppi il budget = raddoppi le vendite. Poco realistico per scale elevate.
+            * **0.85 (Realistico):** Valore consigliato. Tiene conto che scalando il pubblico, il costo per acquisizione (CPA) tende a salire leggermente.
+            * **0.70 (Competitivo):** Mercato saturo o molto competitivo. Grandi incrementi di budget portano a piccoli incrementi di fatturato.
+            
+            > **Suggerimento:** Se hai un ROAS molto alto ora, puoi stare verso 0.90. Se sei già al limite della profittabilità, usa 0.75 per sicurezza.
+            """)        
         sat_factor = st.sidebar.slider("Saturazione", 0.5, 1.0, key="sat_val")
         
         # Grafico Saturazione con Assi
