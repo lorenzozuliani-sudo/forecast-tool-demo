@@ -4,6 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from prophet import Prophet
+import logging
+
+# Disabilita log pesanti di Prophet
+logging.getLogger('prophet').setLevel(logging.ERROR)
+logging.getLogger('cmdstanpy').setLevel(logging.ERROR)
 
 # 1. CONFIGURAZIONE PAGINA
 st.set_page_config(page_title="Forecasting Strategico Pro - DEMO", layout="wide")
@@ -22,10 +30,7 @@ st.markdown("""
     .ai-score-low { background-color: #fff5f5; border-left: 5px solid #f56565; }
     .ai-alert { background-color: #fff5f5; color: #c53030; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.85em; border: 1px solid #feb2b2; }
     .ai-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-right: 5px; background-color: #e2e8f0; color: #4a5568; }
-
-    /* 2. ADATTAMENTO PER DARK MODE (MAC/SYSTEM) */
-    @media (prefers-color-scheme: dark) {
-        .main { background-color: #0e1117; }
+{ background-color: #0e1117; }
         .stMetric, div[data-testid="stExpander"] { background-color: #262730; border: 1px solid #464855; color: #ffffff; }
         h1, h2, h3 { color: #ffffff !important; }
         .ai-box { background-color: #1e1e1e; border-color: #464855; color: #ffffff; }
@@ -33,7 +38,10 @@ st.markdown("""
         .ai-score-high { background-color: #1a2e23; border-left: 5px solid #48bb78; }
         .ai-score-med { background-color: #2d261e; border-left: 5px solid #ed8936; }
         .ai-score-low { background-color: #2d1e1e; border-left: 5px solid #f56565; }
-        .ai-alert { background-color: #442a2a; color: #ff8080; border-color: #663333; }
+        .ai-alert { background-color: #442a2a
+    /* 2. ADATTAMENTO PER DARK MODE (MAC/SYSTEM) */
+    @media (prefers-color-scheme: dark) {
+        .main ; color: #ff8080; border-color: #663333; }
         .ai-tag { background-color: #313d4f; color: #e2e8f0; }
     }
     </style>
@@ -429,8 +437,8 @@ if df is not None:
         
         if st.session_state.last_uploaded_file != current_source_name:
             st.session_state.trend_val = 0.0
-            st.session_state.google_scale = 1.2
-            st.session_state.meta_scale = 1.2
+            st.session_state.google_scale = 1.0
+            st.session_state.meta_scale = 1.0
             st.session_state.sat_val = float(suggested_saturation)
             st.session_state.last_uploaded_file = current_source_name
             st.rerun()
@@ -452,7 +460,7 @@ if df is not None:
         if col_b2.button("🚀 Aggressivo"):
             st.session_state.trend_val = 0.15; st.session_state.google_scale = 1.5; st.session_state.meta_scale = 1.5; st.session_state.sat_val = 0.90; st.rerun()
         if st.sidebar.button(f"🎯 Auto-Calibra (Sat: {suggested_saturation:.2f})"):
-            st.session_state.trend_val = 0.0; st.session_state.google_scale = 1.2; st.session_state.meta_scale = 1.2; st.session_state.sat_val = float(suggested_saturation); st.rerun()
+            st.session_state.trend_val = 0.0; st.session_state.google_scale = 1.0; st.session_state.meta_scale = 1.0; st.session_state.sat_val = float(suggested_saturation); st.rerun()
 
         st.sidebar.divider()
 
@@ -531,7 +539,14 @@ if df is not None:
         c5.metric("Profitto Stimato", f"€ {profit:,.0f}", help="Profitto Operativo dopo Merce, Tasse, Logistica e Ads.")
 
         # --- 5. CALCOLO PREVISIONALE ---
-        df['Week_Num'] = df['Data_Interna'].dt.isocalendar().week
+        # Pre-calcolo delle feature per tutti i modelli (ML e Backtest)
+        df['Week'] = df['Data_Interna'].dt.isocalendar().week
+        df['Week_Sin'] = np.sin(2 * np.pi * df['Week'] / 53)
+        df['Week_Cos'] = np.cos(2 * np.pi * df['Week'] / 53)
+        df['Lag_Sales_1'] = df['Fatturato_Netto'].shift(1)
+        df['Lag_Sales_4'] = df['Fatturato_Netto'].shift(4)
+
+        df['Week_Num'] = df['Week'] # Per retrocompatibilità stagionale
         seasonal = df.groupby('Week_Num').agg({
             'Fatturato_Netto': 'mean', col_google: 'mean', col_meta: 'mean', col_orders: 'mean'
         }).reset_index()
@@ -582,10 +597,186 @@ if df is not None:
         # Calcolo CoS Previsto
         df_prev['CoS Previsto'] = (df_prev['Spesa Totale'] / df_prev['Fatturato Previsto'].replace(0, np.nan)) * 100
         df_prev['CoS Previsto'] = df_prev['CoS Previsto'].fillna(0)
+
+        # --- 5.2 CALCOLO ML AVANZATO ---
+        def run_ml_forecast(df_hist, periods, g_scale, m_scale, sat):
+            # Prepariamo le feature
+            df_train = df_hist.copy()
+            
+            # Feature critiche: Solo i "DRIVER" (quello che conosciamo o possiamo stimare)
+            features_list = ['Week_Sin', 'Week_Cos', col_google, col_meta, 'Lag_Sales_1', 'Lag_Sales_4']
+            
+            # DRIVER DI EFFICIENZA (Influenzano il risultato ma non lo contengono)
+            driver_metrics = [
+                'Average order value', 'Returning customer rate', 'Discounts',
+                'Avg. CPC', 'CPC (All)', 'CPM (Cost per 1,000 Impressions)', 'sessions', 'Frequency'
+            ]
+            valid_drivers = [m for m in driver_metrics if m in df_train.columns]
+            features_list += valid_drivers
+            
+            # METRICHE DI RISULTATO (Sola diagnostica, rimosse dal forecast futuro per evitare pacchi)
+            result_metrics = ['Conversions Value', 'Website Purchases Conversion Value', 'Orders', 'Items', 'Returns']
+            
+            # Gestione NaNs
+            for f in features_list:
+                if f in df_train.columns:
+                    df_train[f] = df_train[f].fillna(df_train[f].median())
+            
+            df_train = df_train.dropna(subset=['Fatturato_Netto'])
+            X = df_train[features_list]
+            y = df_train['Fatturato_Netto']
+            
+            # Modello più conservativo (meno profondità, più alberi)
+            model = RandomForestRegressor(n_estimators=300, max_depth=6, min_samples_leaf=3, random_state=42, n_jobs=-1)
+            model.fit(X, y)
+            
+            # Per il futuro, usiamo le medie delle ultime 4 settimane (più reattive al post-festività)
+            avg_metrics = {m: df_hist[m].tail(4).mean() for m in valid_drivers}
+
+            # Proiezione
+            curr_sales_lag1 = df_hist['Fatturato_Netto'].iloc[-1]
+            curr_sales_lag4 = df_hist['Fatturato_Netto'].iloc[-4]
+            ml_rows = []
+            
+            for i in range(len(df_prev)):
+                d = df_prev.iloc[i]['Data']
+                w = d.isocalendar().week
+                w_sin, w_cos = np.sin(2 * np.pi * w / 53), np.cos(2 * np.pi * w / 53)
+                
+                row_pred = {
+                    'Week_Sin': w_sin, 'Week_Cos': w_cos,
+                    col_google: df_prev.iloc[i]['Google Previsto'],
+                    col_meta: df_prev.iloc[i]['Meta Previsto'],
+                    'Lag_Sales_1': curr_sales_lag1, 'Lag_Sales_4': curr_sales_lag4
+                }
+                # Aggiungiamo le medie storiche per i parametri extra
+                row_pred.update(avg_metrics)
+                
+                X_pred = pd.DataFrame([row_pred])[features_list] # Assicura ordine colonne
+                pred_sales = model.predict(X_pred)[0]
+                
+                curr_sales_lag4 = curr_sales_lag1
+                curr_sales_lag1 = pred_sales
+                
+                ml_rows.append({'Data': d, 'Fatturato_ML': pred_sales, 'Spesa_ML': row_pred[col_google] + row_pred[col_meta]})
+            
+            return pd.DataFrame(ml_rows), model, valid_drivers
+
+        def run_prophet_forecast(df_hist, periods, g_scale, m_scale, seasonal_ref, extra_cols):
+            # Filtriamo extra_cols per usare solo i driver (evitiamo overfitting su Conversion Value)
+            drivers_only = [c for c in extra_cols if c not in ['Conversions Value', 'Orders', 'Items', 'Returns', 'Website Purchases Conversion Value']]
+            
+            # Prophet con Regressori + Configurazione per serie storiche lunghe
+            df_p = df_hist[['Data_Interna', 'Fatturato_Netto', col_google, col_meta] + drivers_only].copy()
+            mapping = {'Data_Interna': 'ds', 'Fatturato_Netto': 'y', col_google: 'google', col_meta: 'meta'}
+            df_p = df_p.rename(columns=mapping)
+            
+            # Changepoint prior scale: 0.05 è bilanciato. Se troppo alto segue troppo i picchi, se troppo basso è troppo rigido.
+            m = Prophet(
+                yearly_seasonality=True, 
+                weekly_seasonality=True, 
+                daily_seasonality=False,
+                changepoint_prior_scale=0.08, # Leggermente più flessibile per catturare trend pluriennali
+                seasonality_prior_scale=10.0
+            )
+            m.add_regressor('google')
+            m.add_regressor('meta')
+            for exc in drivers_only:
+                m.add_regressor(exc)
+            
+            m.add_country_holidays(country_name='IT')
+            m.fit(df_p)
+            
+            future = m.make_future_dataframe(periods=int(periods*4.34), freq='W-MON')
+            # Usiamo una media pesata (esponenziale) per i parametri business, 
+            # dando più peso alle ultime 4-8 settimane rispetto a 6 anni fa.
+            avg_metrics = {c: df_p[c].tail(8).mean() for c in drivers_only}
+
+            def fill_future(ds):
+                w = ds.isocalendar().week
+                base = seasonal_ref[seasonal_ref['Week_Num'] == w]
+                if base.empty: base = seasonal_ref.mean().to_frame().T
+                return base[col_google].values[0] * g_scale, base[col_meta].values[0] * m_scale
+
+            hist_len = len(df_p)
+            future_budget = future.tail(len(future) - hist_len)['ds'].apply(fill_future)
+            
+            future['google'] = df_p['google'].tolist() + [x[0] for x in future_budget]
+            future['meta'] = df_p['meta'].tolist() + [x[1] for x in future_budget]
+            for exc in drivers_only:
+                future[exc] = df_p[exc].tolist() + [avg_metrics[exc]] * (len(future) - hist_len)
+            
+            forecast = m.predict(future)
+            return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(len(future) - hist_len), m
+
+        def run_historical_backtest(df_hist, drivers, target_col):
+            # Eseguiamo un backtest sugli ultimi 12 mesi per misurare l'affidabilità reale
+            # Per ogni mese, alleniamo il modello sul passato e compariamo la previsione col reale
+            backtest_results = []
+            
+            # Troviamo le date degli ultimi 12 mesi
+            last_date = df_hist['Data_Interna'].max()
+            start_backtest = last_date - pd.DateOffset(months=12)
+            test_dates = df_hist[df_hist['Data_Interna'] > start_backtest]['Data_Interna'].unique()
+            
+            # Filtriamo i test_dates per prenderne uno per settimana (per velocità)
+            for d in test_dates:
+                d = pd.to_datetime(d)
+                # Alleniamo solo con i dati precedenti a questa data
+                train_data = df_hist[df_hist['Data_Interna'] < d].copy()
+                if len(train_data) < 20: continue # Serve un minimo di storico
+                
+                # Allenamento veloce Random Forest
+                feat_bt = ['Week_Sin', 'Week_Cos', col_google, col_meta, 'Lag_Sales_1', 'Lag_Sales_4'] + drivers
+                X_train = train_data[feat_bt]
+                y_train = train_data['Fatturato_Netto']
+                
+                # Imputazione NaNs nel training
+                X_train = X_train.fillna(X_train.median())
+                
+                bm = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42)
+                bm.fit(X_train, y_train)
+                
+                # Previsione per la riga reale di quella settimana
+                actual_row = df_hist[df_hist['Data_Interna'] == d].iloc[0]
+                X_test = pd.DataFrame([{
+                    'Week_Sin': np.sin(2 * np.pi * d.isocalendar().week / 53),
+                    'Week_Cos': np.cos(2 * np.pi * d.isocalendar().week / 53),
+                    col_google: actual_row[col_google],
+                    col_meta: actual_row[col_meta],
+                    'Lag_Sales_1': train_data['Fatturato_Netto'].iloc[-1],
+                    'Lag_Sales_4': train_data['Fatturato_Netto'].iloc[-4] if len(train_data) > 4 else train_data['Fatturato_Netto'].iloc[-1]
+                }])
+                for drv in drivers: X_test[drv] = actual_row[drv]
+                
+                pred = bm.predict(X_test)[0]
+                actual = actual_row['Fatturato_Netto']
+                
+                error = abs(pred - actual) / actual if actual > 0 else 0
+                accuracy = max(0, 1 - error)
+                
+                backtest_results.append({
+                    'Anno': d.year,
+                    'Mese_Num': d.month,
+                    'Mese': d.strftime('%b'),
+                    'Accuratezza': accuracy
+                })
+            
+            if not backtest_results: return None
+            
+            bt_df = pd.DataFrame(backtest_results)
+            # Pivot table: Righe = Mese, Colonne = Anno
+            pivot_bt = bt_df.groupby(['Mese', 'Anno', 'Mese_Num'])['Accuratezza'].mean().reset_index()
+            pivot_bt = pivot_bt.pivot(index=['Mese_Num', 'Mese'], columns='Anno', values='Accuratezza').sort_index()
+            return pivot_bt
+
+        df_ml, ml_model, businesses_found = run_ml_forecast(df, mesi_prev, m_google, m_meta, sat_factor)
+        df_prophet, p_model = run_prophet_forecast(df, mesi_prev, m_google, m_meta, seasonal, businesses_found)
+        df_backtest = run_historical_backtest(df, businesses_found, 'Fatturato_Netto')
         
         # --- 6. VISUALIZZAZIONE TABS ---
         tabs = st.tabs([
-            "📉 Grafico Previsionale", "📋 Dettaglio Previsione", "🔵 Analisi Google Ads", 
+            "🔮 ML Forecasting", "🔵 Analisi Google Ads", 
             "🔵 Analisi Meta Ads", "🧪 Analisi Saturazione Storica", "📊 Analisi Resi", 
             "🗂️ Dati CSV", "🧠 Insight AI", "🎯 Ottimizzazione", "🏥 Health Check"
         ])
@@ -596,34 +787,221 @@ if df is not None:
         GREEN_COLOR = '#2ecc71'   
         ORANGE_COLOR = '#e67e22'  
         
+
         with tabs[0]:
-            st.caption("Questo grafico confronta l'andamento storico del fatturato (Verde) con la proiezione futura (Arancione).")
-            fig, ax1 = plt.subplots(figsize=(12, 6))
-            ax1.plot(df['Data_Interna'], df['Fatturato_Netto'], color=GREEN_COLOR, label='Storico', linewidth=1)
-            ax1.plot(df_prev['Data'], df_prev['Fatturato Previsto'], color=ORANGE_COLOR, linestyle='--', label='Previsione', linewidth=2)
-            ax1.set_ylabel("Fatturato (€)")
-            ax2 = ax1.twinx()
-            ax2.stackplot(pd.concat([df['Data_Interna'], df_prev['Data']]),
-                          np.concatenate([df[col_google], df_prev['Google Previsto']]),
-                          np.concatenate([df[col_meta], df_prev['Meta Previsto']]),
-                          colors=[DARKEST_BLUE, META_COLOR], alpha=0.3, labels=['Google Ads', 'Meta Ads'])
-            ax1.legend(loc='upper left')
-            st.pyplot(fig)
+            st.header("🔮 Advanced AI Forecasting: Battle of Models")
+            
+            with st.expander("📖 Guida ai Modelli: Cosa sto leggendo?"):
+                st.markdown("""
+                In questa sezione, tre diverse "intelligenze" analizzano i tuoi dati per prevedere il futuro. Ognuna ha un punto di vista differente:
+                
+                1.  **🔸 Heuristic (Stagionalità Media):** 
+                    *   **Cos'è:** Un modello basato sulla media storica. 
+                    *   **Cosa guarda:** Ripete semplicemente l'andamento degli anni passati. 
+                    *   **Limiti:** Non capisce se aumenti il budget o se il mercato è cambiato. È la tua "linea di base".
+                
+                2.  **💜 ML: Random Forest (Budget Focus):** 
+                    *   **Cos'è:** Un algoritmo di Machine Learning puro. 
+                    *   **Cosa guarda:** È molto sensibile alla **spesa pubblicitaria**. Cerca di capire: *"Se spendo 1€ in più su Meta, quanto fatturato extra ottengo?"*.
+                    *   **Punto di forza:** È il migliore per simulare scenari di scalabilità del budget.
+                
+                3.  **🔹 AI: Facebook Prophet (Season Focus):** 
+                    *   **Cos'è:** Un modello avanzato creato da Meta per i dati di business. 
+                    *   **Cosa guarda:** Eccelle nel trovare **pattern ciclici** (es. ogni lunedì vendi di più) e l'effetto delle **festività** (Black Friday, Natale).
+                    *   **Punto di forza:** Include la *"nuvola di incertezza"*, mostrandoti il rischio della previsione.
+                
+                4.  **📉 Media Ensemble:** 
+                    *   **La verità sta nel mezzo:** Spesso la previsione più accurata è la media tra il focus sul budget (ML) e il focus sulla stagionalità (Prophet).
+                """)
+
+            st.caption("Confronto tra Random Forest (più sensibile al budget) e Facebook Prophet (più sensibile a stagionalità e festività).")
+            
+            col_ml1, col_ml2 = st.columns([2, 1])
+            
+            with col_ml1:
+                fig_ml, ax_ml = plt.subplots(figsize=(10, 5))
+                ax_ml.plot(df['Data_Interna'], df['Fatturato_Netto'], label='Storico Reale', color='gray', alpha=0.3)
+                
+                # Modello Heuristic
+                ax_ml.plot(df_prev['Data'], df_prev['Fatturato Previsto'], label='Heuristic (Stag. Media)', color=ORANGE_COLOR, linestyle=':')
+                
+                # Modello Random Forest
+                ax_ml.plot(df_ml['Data'], df_ml['Fatturato_ML'], label='ML: Random Forest (Budget Focus)', color='#9b59b6', linewidth=2)
+                
+                # Modello Prophet
+                ax_ml.plot(df_prophet['ds'], df_prophet['yhat'], label='AI: Facebook Prophet (Season Focus)', color='#3498db', linewidth=2)
+                ax_ml.fill_between(df_prophet['ds'], df_prophet['yhat_lower'], df_prophet['yhat_upper'], color='#3498db', alpha=0.15, label='Incertezza Prophet')
+                
+                ax_ml.set_title("Proiezione Multimodale")
+                ax_ml.legend(fontsize=8)
+                st.pyplot(fig_ml)
+            
+            with col_ml2:
+                st.subheader("💡 Analisi Strategica AI")
+                
+                # Calcola quale modello prevede più fatturato
+                rf_total = df_ml['Fatturato_ML'].sum()
+                p_total = df_prophet['yhat'].sum()
+                
+                st.info(f"""
+                **Previsione Totale Periodo:**
+                * **Random Forest:** € {rf_total:,.0f}
+                * **Prophet:** € {p_total:,.0f}
+                """)
+                
+                diff = abs(rf_total - p_total) / min(rf_total, p_total)
+                if diff < 0.1:
+                    st.success("🟢 **Consenso Elevato:** I due modelli concordano. La previsione è molto solida.")
+                else:
+                    st.warning("🟡 **Divergenza:** I modelli hanno visioni diverse. Prophet vede più/meno stagionalità rispetto all'impatto del budget stimato dal RF.")
+                
+                st.subheader("Feature Importance (RF)")
+                importances = ml_model.feature_importances_
+                
+                # Creiamo una lista leggibile delle feature presenti
+                base_features = ['Stag. (S)', 'Stag. (C)', 'Budget G.', 'Budget M.', 'Lag 1w', 'Lag 4w']
+                all_feature_names = base_features + [b.replace('Website Purchases ', 'Meta ').replace('Conversion Value', 'Val. Conv.') for b in businesses_found]
+                
+                feat_df = pd.DataFrame({'Feature': all_feature_names, 'Importanza': importances}).sort_values('Importanza', ascending=True)
+                fig_feat, ax_feat = plt.subplots(figsize=(5, 8))
+                ax_feat.barh(feat_df['Feature'], feat_df['Importanza'], color='#9b59b6')
+                ax_feat.set_title("Cosa guida veramente il tuo business?", fontsize=10)
+                ax_feat.tick_params(axis='both', which='major', labelsize=8)
+                st.pyplot(fig_feat)
+
+            st.divider()
+            st.subheader("📈 Analisi Affidabilità: Quanto ha indovinato l'AI nel passato?")
+            st.caption("Questa tabella mostra la percentuale di accuratezza che il modello avrebbe ottenuto se fosse stato usato negli anni scorsi (Backtesting).")
+            
+            if df_backtest is not None:
+                # Applichiamo una colorazione per rendere la tabella leggibile
+                def color_accuracy(val):
+                    if pd.isna(val): return ''
+                    color = 'green' if val > 0.9 else 'orange' if val > 0.8 else 'red'
+                    return f'color: {color}'
+
+                st.dataframe(df_backtest.style.format("{:.1%}") \
+                           .applymap(color_accuracy))
+                
+                st.info("""
+                **Cosa indicano i colori?**
+                *   🟢 **Sopra 90%**: Il modello è estremamente solido in questo periodo.
+                *   🟠 **80% - 90%**: Buona precisione, ma ci sono fattori esterni che influenzano il risultato.
+                *   🔴 **Sotto 80%**: Periodo di forte instabilità (es. inizio saldi, eventi spot), l'AI qui va presa con cautela.
+                """)
+            else:
+                st.info("Carica uno storico più lungo (almeno 6 mesi) per vedere l'analisi di affidabilità mensile.")
+
+            st.divider()
+            st.subheader("📅 Tabella Comparativa")
+            # Uniamo le previsioni per una tabella chiara
+            df_comp_final = df_ml.copy()
+            df_prophet_clean = df_prophet[['ds', 'yhat']].copy()
+            df_prophet_clean.columns = ['Data', 'Fatturato_Prophet']
+            
+            # NORMALIZZAZIONE DATE PER IL MERGE (Togliamo ore/minuti e allineiamo)
+            df_comp_final['Data'] = pd.to_datetime(df_comp_final['Data']).dt.normalize()
+            df_prophet_clean['Data'] = pd.to_datetime(df_prophet_clean['Data']).dt.normalize()
+            
+            # Usiamo un merge 'outer' o 'left' per sicurezza e debug
+            df_final_tab = pd.merge(df_comp_final, df_prophet_clean, on='Data', how='inner')
+            
+            if df_final_tab.empty:
+                st.warning("⚠️ Nota: I dati di Prophet e ML non sono allineati temporalmente. Prova a ricaricare i dati.")
+            else:
+                df_final_tab['Media_Ensemble'] = (df_final_tab['Fatturato_ML'] + df_final_tab['Fatturato_Prophet']) / 2
+                
+                st.dataframe(df_final_tab.style.format({
+                    'Fatturato_ML': '€ {:,.0f}', 
+                    'Fatturato_Prophet': '€ {:,.0f}', 
+                    'Media_Ensemble': '€ {:,.0f}',
+                    'Spesa_ML': '€ {:,.0f}'
+                }))
+
+            st.divider()
+            st.subheader("🧪 Simulatore di Precisione (Actual vs Forecast)")
+            st.write("Scegli una settimana dal tuo storico e confronta quello che è successo realmente con quello che l'AI avrebbe previsto.")
+            
+            # Selettore della settimana
+            date_options = df['Data_Interna'].dt.date.unique()
+            selected_test_date = st.selectbox(
+                "📅 Seleziona la settimana da verificare", 
+                options=date_options,
+                index=len(date_options)-1,
+                help="I dati di spesa e fatturato verranno pre-compilati automaticamente."
+            )
+            
+            # Recupera dati reali per quella data
+            actual_row = df[df['Data_Interna'].dt.date == selected_test_date].iloc[0]
+            
+            with st.container():
+                c_test1, c_test2, c_test3 = st.columns(3)
+                test_g = c_test1.number_input("Spesa Google (€)", value=float(actual_row[col_google]), step=100.0)
+                test_m = c_test2.number_input("Spesa Meta (€)", value=float(actual_row[col_meta]), step=100.0)
+                test_actual = c_test3.number_input("Fatturato Reale (€)", value=float(actual_row['Fatturato_Netto']), step=500.0)
+                
+                if st.button("🚀 Avvia Test di Validazione AI"):
+                    # Trova l'indice per calcolare i LAG precedenti a quella data
+                    idx_list = df[df['Data_Interna'].dt.date == selected_test_date].index
+                    if not idx_list.empty:
+                        idx = idx_list[0]
+                        
+                        # 1. Prediction con Random Forest
+                        test_dt = pd.to_datetime(selected_test_date)
+                        curr_w = test_dt.isocalendar().week
+                        w_sin, w_cos = np.sin(2 * np.pi * curr_w / 53), np.cos(2 * np.pi * curr_w / 53)
+                        
+                        # Prendi i Lag basandoti sulla riga selezionata (usiamo dati disponibili PRIMA)
+                        l1 = df['Fatturato_Netto'].iloc[idx-1] if idx > 0 else actual_row['Fatturato_Netto']
+                        l4 = df['Fatturato_Netto'].iloc[idx-4] if idx > 3 else actual_row['Fatturato_Netto']
+                        
+                        row_val = {
+                            'Week_Sin': w_sin, 'Week_Cos': w_cos, 
+                            col_google: test_g, col_meta: test_m, 
+                            'Lag_Sales_1': l1, 'Lag_Sales_4': l4
+                        }
+                        # Aggiungiamo i valori business reali di quella riga per il test
+                        for b in businesses_found:
+                            row_val[b] = actual_row[b]
+
+                        X_val = pd.DataFrame([row_val])
+                        rf_pred = ml_model.predict(X_val)[0]
+                        
+                        # 2. Prediction con Prophet
+                        test_dict_p = {'ds': test_dt, 'google': test_g, 'meta': test_m}
+                        for b in businesses_found:
+                            test_dict_p[b] = actual_row[b]
+                        
+                        test_df_p = pd.DataFrame([test_dict_p])
+                        p_pred = p_model.predict(test_df_p)['yhat'].values[0]
+                        
+                        avg_pred = (rf_pred + p_pred) / 2
+
+                        st.markdown("---")
+                        res_c1, res_c2, res_c3 = st.columns(3)
+                        res_c1.metric("Previsione RF", f"€ {rf_pred:,.2f}")
+                        res_c2.metric("Previsione Prophet", f"€ {p_pred:,.2f}")
+                        res_c3.metric("Media Ensemble", f"€ {avg_pred:,.2f}", delta="Target AI")
+                        
+                        if test_actual > 0:
+                            error = abs(avg_pred - test_actual) / test_actual
+                            accuracy = (1 - error) * 100
+                            st.subheader(f"🎯 Accuratezza Riscontrata: {accuracy:.1f}%")
+                            
+                            if accuracy > 92: st.success("🏆 Eccellente! I modelli hanno catturato perfettamente il trend di questa settimana.")
+                            elif accuracy > 85: st.info("📉 Buona precisione. Lo scostamento rientra nei margini statistici.")
+                            else: 
+                                st.warning(f"⚠️ Scostamento del {error*100:.1f}%.")
+                                # Analisi anomalie
+                                st.write("**Possibili cause individuate dall'AI:**")
+                                historical_cpc = df['Avg. CPC'].mean() if 'Avg. CPC' in df.columns else 0
+                                if test_g/test_actual < df[col_google].mean()/df['Fatturato_Netto'].mean() * 0.8:
+                                    st.write("- 🚩 **Efficienza Ads anomala**: Hai speso molto meno del solito per generare questo fatturato. C'era un evento organico?")
+                                if 'Avg. CPC' in actual_row and actual_row['Avg. CPC'] > historical_cpc * 1.3:
+                                    st.write("- 🚩 **CPC Alert**: Il costo per click di questa settimana era il 30% più alto della media, distorcendo la previsione.")
+                                st.write("- 🚩 **Dato mancante**: L'AI non vede sconti o stock-out che potrebbero aver influenzato il risultato.")
 
         with tabs[1]:
-            st.caption("Tabelle dettagliate con i numeri mese per mese e settimana per settimana.")
-            st.subheader("📅 Riepilogo Mensile")
-            df_prev['Mese'] = df_prev['Data'].dt.strftime('%B %Y')
-            df_monthly = df_prev.groupby('Mese', sort=False).agg({'Spesa Totale': 'sum', 'Fatturato Previsto': 'sum'}).reset_index()
-            df_monthly['MER Previsto'] = df_monthly['Fatturato Previsto'] / df_monthly['Spesa Totale']
-            df_monthly['CoS Previsto'] = (df_monthly['Spesa Totale'] / df_monthly['Fatturato Previsto'].replace(0, np.nan)) * 100
-            
-            st.dataframe(df_monthly.style.format({'Spesa Totale': '€ {:,.0f}', 'Fatturato Previsto': '€ {:,.0f}', 'MER Previsto': '{:.2f}', 'CoS Previsto': '{:.1f}%'}))
-            
-            st.write("**Dettaglio Settimanale**")
-            st.dataframe(df_prev[['Periodo', 'Spesa Totale', 'Fatturato Previsto', 'MER Previsto', 'CoS Previsto']].style.format({'Spesa Totale': '€ {:,.0f}', 'Fatturato Previsto': '€ {:,.0f}', 'MER Previsto': '{:.2f}', 'CoS Previsto': '{:.1f}%'}))
-
-        with tabs[2]:
             st.caption("Focus sulle performance storiche di Google Ads.")
             st.subheader("🔵 Performance Google Ads")
             if col_g_val in df.columns:
@@ -637,7 +1015,7 @@ if df is not None:
                 st.pyplot(fig_g)
                 st.dataframe(df[['Periodo', col_google, col_g_val, 'ROAS_Google', col_g_cpc]].iloc[::-1].style.format({col_google: '€ {:,.2f}', col_g_val: '€ {:,.2f}', 'ROAS_Google': '{:.2f}', col_g_cpc: '€ {:,.2f}'}))
 
-        with tabs[3]:
+        with tabs[2]:
             st.caption("Focus sulle performance storiche di Meta Ads.")
             st.subheader("🔵 Performance Meta Ads")
             if col_m_val in df.columns:
@@ -651,7 +1029,7 @@ if df is not None:
                 st.pyplot(fig_m)
                 st.dataframe(df[['Periodo', col_meta, col_m_val, 'ROAS_Meta', col_m_cpc, col_m_cpm, col_m_freq]].iloc[::-1].style.format({col_meta: '€ {:,.2f}', col_m_val: '€ {:,.2f}', 'ROAS_Meta': '{:.2f}', col_m_cpc: '€ {:,.2f}', col_m_cpm: '€ {:,.2f}', col_m_freq: '{:.2f}'}))
 
-        with tabs[4]:
+        with tabs[3]:
             st.caption("Analisi dell'elasticità: misura quanto il fatturato reagisce alle variazioni di spesa pubblicitaria.")
             st.header("🧪 Analisi Saturazione e Scalabilità")
             st.subheader("1. Riepilogo Annuale Completo")
@@ -708,7 +1086,7 @@ if df is not None:
                 plt.colorbar(scatter, label='Elasticità')
                 st.pyplot(fig_sat)
 
-        with tabs[5]:
+        with tabs[4]:
             st.caption("Confronto tra spesa e resi.")
             st.subheader("🔍 Spesa Ads vs Tasso Resi")
             fig2, ax1_2 = plt.subplots(figsize=(12, 6))
@@ -717,7 +1095,7 @@ if df is not None:
             ax2_2.plot(df['Data_Interna'], df['Tasso_Resi'].rolling(4).mean(), color='#e74c3c', linewidth=2)
             st.pyplot(fig2)
 
-        with tabs[6]:
+        with tabs[5]:
             st.caption("Il database grezzo importato.")
             st.subheader("🗂️ Database Storico")
             display_cols = [col_date, 'Periodo', 'Total sales', col_google, col_g_val, col_g_cpc, col_g_imps, 
@@ -726,7 +1104,7 @@ if df is not None:
             st.dataframe(df[valid_cols].iloc[::-1].style.format({'CoS': '{:.1f}%', 'Profitto_Operativo': '€ {:,.0f}'}, precision=2))
 
         # --- 8. TAB AI AVANZATA ---
-        with tabs[7]:
+        with tabs[6]:
             st.caption("Analisi automatica che incrocia Profitto, Retention e Performance Canali.")
             st.header("🧠 Insight AI: Analisi Strategica Completa")
             
@@ -802,7 +1180,7 @@ if df is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-        with tabs[8]:
+        with tabs[7]:
             st.header("🎯 Strategia di Scalabilità Safe")
             st.subheader("Pianificazione Budget Ads per il Prossimo Mese")
             
@@ -862,7 +1240,7 @@ if df is not None:
             else:
                 st.error("Il profitto richiesto è troppo alto rispetto al fatturato previsto. Riduci l'obiettivo o aumenta i margini.")      
      
-        with tabs[9]:
+        with tabs[8]:
             st.header("🏥 Stato di Salute del Progetto (YoY)")
             
             years_avail = sorted(df['Year'].unique(), reverse=True)
