@@ -30,49 +30,19 @@ st.markdown("""
     .ai-score-low { background-color: #fff5f5; border-left: 5px solid #f56565; }
     .ai-alert { background-color: #fff5f5; color: #c53030; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.85em; border: 1px solid #feb2b2; }
     .ai-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-right: 5px; background-color: #e2e8f0; color: #4a5568; }
-
-    /* 2. ADATTAMENTO PER DARK MODE */
-    @media (prefers-color-scheme: dark) {
-        .main { background-color: #0e1117; }
+{ background-color: #0e1117; }
         .stMetric, div[data-testid="stExpander"] { background-color: #262730; border: 1px solid #464855; color: #ffffff; }
         h1, h2, h3 { color: #ffffff !important; }
         .ai-box { background-color: #1e1e1e; border-color: #464855; color: #ffffff; }
+        /* Varianti colori AI per Dark Mode per mantenere leggibilità */
         .ai-score-high { background-color: #1a2e23; border-left: 5px solid #48bb78; }
         .ai-score-med { background-color: #2d261e; border-left: 5px solid #ed8936; }
         .ai-score-low { background-color: #2d1e1e; border-left: 5px solid #f56565; }
-        .ai-alert { background-color: #442a2a; color: #ff8080; border-color: #663333; }
-        .ai-tag { background-color: #313d4f; color: #e2e8f0; }
-        .welcome-card { background-color: #1e1e1e !important; border-color: #464855 !important; }
-    }
-
-    /* 3. WELCOME HERO SECTION */
-    .welcome-card {
-        background-color: #ffffff;
-        padding: 40px;
-        border-radius: 15px;
-        border: 1px solid #e1e4e8;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    .hero-title {
-        font-size: 2.5em;
-        font-weight: 800;
-        background: -webkit-linear-gradient(#2c3e50, #000080);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 15px;
-    }
-    .option-card {
-        background-color: #ffffff;
-        padding: 25px;
-        border-radius: 12px;
-        border: 1px solid #e1e4e8;
-        height: 100%;
-    }
+        .ai-alert { background-color: #442a2a
+    /* 2. ADATTAMENTO PER DARK MODE (MAC/SYSTEM) */
     @media (prefers-color-scheme: dark) {
-        .option-card { background-color: #262730; border-color: #464855; }
-        .hero-title { background: -webkit-linear-gradient(#ffffff, #3b5998); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .main ; color: #ff8080; border-color: #663333; }
+        .ai-tag { background-color: #313d4f; color: #e2e8f0; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -236,10 +206,15 @@ with st.expander("ℹ️ Guida Rapida: Cosa fa questo strumento?"):
         Un motore di analisi euristica e algoritmica valuta cross-periodicamente la salute multi-dimensionale del brand. Incrociando parametri di **Retention Rate**, efficienza dei canali (Google vs Meta), incidenza della pressione promozionale (*Discount Rate*) e stabilità del carrello medio (AOV), l'AI sintetizza un **Health Score**. Questo permette di identificare anomalie operative e segnali di deterioramento del modello di business prima che diventino critici a bilancio.
     """)
 
-# Inizializzazione stato per modalità Demo
-if 'demo_mode' not in st.session_state:
-    st.session_state['demo_mode'] = False
-demo_mode = st.session_state['demo_mode']
+# --- SIDEBAR: CONTROLLI ---
+st.sidebar.header("🕹️ Dati & Pannello")
+demo_mode = st.sidebar.toggle("🚀 Usa Modalità DEMO (Dati Casuali)", value=False)
+
+uploaded_file = None
+if not demo_mode:
+    uploaded_file = st.sidebar.file_uploader("Carica il file .csv", type="csv")
+
+st.sidebar.divider()
 
 # --- SIDEBAR: BUSINESS ECONOMICS ---
 st.sidebar.header("⚙️ Business Economics")
@@ -369,30 +344,19 @@ with st.expander("📋 Guida: Come formattare il CSV per la versione completa"):
 df = None
 
 # 1. Recupero DataFrame (Demo o File)
-final_file = st.session_state.get('uploaded_file_main')
-
-if demo_mode or final_file is not None:
-    with st.spinner("📂 Caricamento e preparazione dati..."):
-        if demo_mode:
-            df = generate_demo_data()
-            st.success("✅ Dati DEMO generati (Pattern Non-Lineare)!")
-        else:
-            try:
-                df = pd.read_csv(final_file, sep=None, engine='python')
-                df = df.dropna(how='all')
-            except Exception as e:
-                st.error(f"Errore nel caricamento del file: {e}")
+with st.spinner("📂 Caricamento e preparazione dati..."):
+    if demo_mode:
+        df = generate_demo_data()
+        st.success("✅ Dati DEMO generati (Pattern Non-Lineare)!")
+    elif uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
+            df = df.dropna(how='all')
+        except Exception as e:
+            st.error(f"Errore: {e}")
 
 # 2. Elaborazione Completa (Se df esiste)
 if df is not None:
-    # Aggiungiamo un tasto di Reset nella sidebar solo quando i dati sono carichi
-    if st.sidebar.button("🧹 Reset / Carica Nuovo File"):
-        if 'uploaded_file_main' in st.session_state:
-            del st.session_state['uploaded_file_main']
-        st.session_state['demo_mode'] = False
-        st.rerun()
-    st.sidebar.divider()
-    
     try:
         df.columns = df.columns.str.strip()
 
@@ -1395,42 +1359,4 @@ if df is not None:
     except Exception as e:
         st.error(f"⚠️ Errore: {e}")
 else:
-    # --- HERO WELCOME SECTION ---
-    st.markdown("""
-        <div class="welcome-card">
-            <div class="hero-title">👋 Benvenuto in AntiGravity Forecasting</div>
-            <p style="font-size: 1.25em; color: #5d6d7e;">Il Framework Avanzato di Predictive Analytics per la Crescita del tuo E-commerce.</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    col_main_up1, col_main_up2 = st.columns([1.8, 1.2], gap="large")
-    
-    with col_main_up1:
-        st.markdown("""
-            <div style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 5px;">📂 Caricamento Dati Storici</h3>
-                <p style="color: #666; font-size: 0.9em;">Carica il file .csv esportato dalla tua dashboard (Shopify, Meta, Google).</p>
-            </div>
-        """, unsafe_allow_html=True)
-        main_uploaded_file = st.file_uploader("", type="csv", label_visibility="collapsed")
-        
-        if main_uploaded_file is not None:
-            st.session_state['uploaded_file_main'] = main_uploaded_file
-            st.rerun()
-            
-    with col_main_up2:
-        st.markdown("""
-            <div class="option-card">
-                <h3 style="margin-top:0;">🕹️ Opzioni Rapide</h3>
-                <p style="color: #666; font-size: 0.85em; margin-bottom: 20px;">Non hai ancora un file pronto? Esplora le potenzialità della piattaforma con un dataset simulato ad alta precisione.</p>
-        """, unsafe_allow_html=True)
-        
-        if st.toggle("🚀 Attiva Modalità DEMO", value=st.session_state['demo_mode'], help="Genera uno storico di 5 anni con stagionalità e trend realistici."):
-            st.session_state['demo_mode'] = True
-            st.rerun()
-        else:
-            st.session_state['demo_mode'] = False
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-            
-    st.info("💡 **Pro Tip**: Prima di caricare, consulta la sezione 'Guida Rapida' qui sopra per comprendere l'architettura dei calcoli e il formato dati richiesto.")
+    st.info("👋 Carica il file CSV nel menu a sinistra per iniziare, oppure attiva la modalità DEMO.")
