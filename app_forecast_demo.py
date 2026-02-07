@@ -189,17 +189,37 @@ st.title("📈 Simulatore Business & Forecasting")
 
 with st.expander("ℹ️ Guida Rapida: Cosa fa questo strumento?"):
     st.markdown("""
-    Questo strumento è un **CFO Virtuale e Simulatore Strategico** progettato per e-commerce. Non si limita a visualizzare i dati passati, ma ti aiuta a pianificare il futuro economico.
-    
-    **A cosa serve:**
-    1.  **💰 Controllo Profittabilità (Business Economics):** Inserendo i tuoi margini nella colonna di sinistra, il tool calcola il *Break-Even ROAS* (il punto di pareggio) e ti dice se stai realmente guadagnando o se stai solo "muovendo soldi".
-    2.  **🔮 Forecasting (Previsione):** Ti permette di simulare scenari futuri ("Cosa succede se raddoppio il budget su Meta?"). Usa i dati storici e la stagionalità per proiettare fatturato e costi.
-    3.  **⚖️ Analisi Efficienza (Saturazione):** Ti aiuta a capire se aumentando la spesa pubblicitaria il fatturato cresce di pari passo (alta elasticità) o se stai saturando il pubblico (bassa efficienza).
-    4.  **🧠 Intelligence Automatica (AI):** Un algoritmo analizza la qualità del business (Retention, Sconti, Canali) e ti dà un punteggio di salute mensile.
+    Questo ecosistema di analisi rappresenta un **Advanced Business Intelligence Framework** integrato con modelli di **Predictive Analytics** e **CFO Automation**, specificamente ingegnerizzato per scale-up e-commerce. Non si limita alla mera visualizzazione descrittiva (Data Visualization), ma implementa motori di calcolo prescrittivi per la pianificazione finanziaria e strategica basata sulla probabilità statistica.
+
+    ### Architettura e Funzioni Core:
+
+    1.  **💰 Unit Economics & Financial Modeling (Controllo Profittabilità):**
+        Il modulo integra un calcolo dinamico della *Unit Economics* a livello di singolo cliente (LTV - Lifetime Value) e singolo ordine. Attraverso l'elaborazione dei margini industriali (COGS), dei costi di fulfillment, dell'incidenza fiscale e del tasso di reso, l'algoritmo determina il **Break-Even ROAS** e il **Cap-CPA**. Questo permette di distinguere il fatturato vanitoso (*Vanity Metrics*) dal margine operativo reale, identificando la soglia di sopravvivenza finanziaria oltre la quale ogni euro investito genera profitto netto.
+
+    2.  **🔮 Multi-Model Predictive Forecasting (Previsione Avanzata):**
+        Il simulatore utilizza modelli ensemble che combinano **Facebook Prophet** (per la decomposizione delle serie storiche, stagionalità complessa e holiday effects) con algoritmi di **Random Forest**. Questo approccio permette di isolare l'impatto dei driver di spesa (Paid Ads) dalle fluttuazioni organiche e stagionali. Inserendo scenari ipotetici di budget, il sistema proietta il *Expected Revenue* con intervalli di confidenza statistica, simulando la reazione del business a variazioni di scala.
+
+    3.  **⚖️ Marketing Elasticity & Diminishing Returns (Analisi Saturazione):**
+        Attraverso lo studio delle curve di saturazione, lo strumento calcola il coefficiente di **Elasticità del Fatturato** rispetto alla spesa pubblicitaria. Questo modulo rileva i rendimenti marginali decrescenti: identifica il punto di saturazione oltre il quale l'incremento di budget Ads non produce più una crescita lineare dei ricavi, ma causa un innalzamento del CAC e una contrazione del margine. Essenziale per determinare lo *"Sweet Spot"* di spesa ottimale.
+
+    4.  **🧠 Autonomous Business Intelligence (AI Score):**
+        Un motore di analisi euristica e algoritmica valuta cross-periodicamente la salute multi-dimensionale del brand. Incrociando parametri di **Retention Rate**, efficienza dei canali (Google vs Meta), incidenza della pressione promozionale (*Discount Rate*) e stabilità del carrello medio (AOV), l'AI sintetizza un **Health Score**. Questo permette di identificare anomalie operative e segnali di deterioramento del modello di business prima che diventino critici a bilancio.
     """)
+
+# --- SIDEBAR: CONTROLLI ---
+st.sidebar.header("🕹️ Dati & Pannello")
+demo_mode = st.sidebar.toggle("🚀 Usa Modalità DEMO (Dati Casuali)", value=False)
+
+uploaded_file = None
+if not demo_mode:
+    uploaded_file = st.sidebar.file_uploader("Carica il file .csv", type="csv")
+
+st.sidebar.divider()
 
 # --- SIDEBAR: BUSINESS ECONOMICS ---
 st.sidebar.header("⚙️ Business Economics")
+st.sidebar.info("**A cosa serve?** Questa sezione serve a calcolare il tuo **Break-Even point** (punto di pareggio). Inserendo i tuoi costi reali, il simulatore capisce qual è il ROAS minimo necessario per non andare in perdita.")
+
 with st.sidebar.expander("1. Input Metriche", expanded=True):
     # INPUT UTENTE
     be_aov = st.number_input(
@@ -262,6 +282,7 @@ with st.sidebar.expander("1. Input Metriche", expanded=True):
     be_roas_val = be_aov / be_cpa if be_cpa > 0 else 99.9
 
 with st.sidebar.expander("2. Output Calcolati (Live)", expanded=True):
+    st.caption("Questi sono i risultati derivati dai tuoi input. Calcolano quanto valore genera ogni ordine/cliente e definiscono i tuoi limiti di spesa (Break-Even) per il simulatore.")
     st.markdown("---")
     
     st.markdown(f"**AOV (Netto)**: € {aov_post_tax_returns:.2f}")
@@ -287,43 +308,52 @@ with st.sidebar.expander("2. Output Calcolati (Live)", expanded=True):
         help="Ritorno sulla spesa pubblicitaria minimo necessario. Formula: `AOV / Break Even CPA`."
     )
 
-st.sidebar.divider()
 
-# --- SIDEBAR: CONTROLLI ---
-st.sidebar.header("🕹️ Dati & Pannello")
-demo_mode = st.sidebar.toggle("🚀 Usa Modalità DEMO (Dati Casuali)", value=False)
 
-uploaded_file = None
-if not demo_mode:
-    uploaded_file = st.sidebar.file_uploader("Carica il file .csv", type="csv")
 
 # --- GUIDA FORMATO CSV ---
 with st.expander("📋 Guida: Come formattare il CSV per la versione completa"):
     st.markdown("""
-    Per utilizzare la versione completa, il file CSV deve contenere le seguenti colonne:
-    | Colonna | Descrizione |
-    | :--- | :--- |
-    | `Year Week` | Data settimanale (es. 202501) |
-    | `Cost` | Spesa Google Ads |
-    | `Amount Spent` | Spesa Meta Ads |
-    | `Total sales` | Fatturato netto Shopify |
-    | `Returns` | Valore dei resi |
-    | `Orders` | Numero totale ordini |
+    Per far funzionare correttamente gli algoritmi di AI e le analisi finanziarie, il file CSV deve seguire questa struttura:
+
+    ### 🟢 Colonne Obbligatorie (Core)
+    | Colonna | Descrizione | Formato Esempio |
+    | :--- | :--- | :--- |
+    | **`Year Week`** | Identificativo univoco Anno + Settimana | `202501` (Settimana 1 del 2025) |
+    | **`Cost`** | Spesa totale su Google Ads | `1200.50` o `€ 1.200,50` |
+    | **`Amount Spent`** | Spesa totale su Meta Ads | `850.00` o `€ 850,00` |
+    | **`Total sales`** | Fatturato netto totale (Shopify) | `15000.00` o `€ 15.000,00` |
+
+    ### 🟡 Colonne Opzionali (Analisi Avanzata)
+    *Consigliate per abilitare i tab "Insight AI", "Resi" e "Ottimizzazione".*
+
+    | Colonna | Utilizzo | Formato Esempio |
+    | :--- | :--- | :--- |
+    | `Returns` | Calcolo marginalità reale e Tab Resi | `-120.00` (Valore possibilmente negativo) |
+    | `Discounts` | Analisi pressione promozionale in AI Insight | `-450.00` |
+    | `Orders` | Calcolo Carrello Medio (AOV) e CPA | `120` (Numero intero) |
+    | `Average order value` | Backup per Business Economics | `125.00` |
+    | `Returning customer rate` | Analisi Retention in AI Insight | `15%` o `0.15` |
+    | `Conversions Value` | ROAS specifico Google Ads | `5000.00` |
+    | `Website Purchases Conversion Value` | ROAS specifico Meta Ads | `4000.00` |
+    | `Avg. CPC` / `CPC (All)` | Qualità del traffico e Costi Click | `0.85` |
+    | `CPM` / `Frequency` | Analisi saturazione Meta | `12.50` / `1.2` |
     """)
 
 # --- LOGICA CARICAMENTO E PULIZIA (UNIFICATA) ---
 df = None
 
 # 1. Recupero DataFrame (Demo o File)
-if demo_mode:
-    df = generate_demo_data()
-    st.success("✅ Dati DEMO generati (Pattern Non-Lineare)!")
-elif uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file, sep=None, engine='python')
-        df = df.dropna(how='all')
-    except Exception as e:
-        st.error(f"Errore: {e}")
+with st.spinner("📂 Caricamento e preparazione dati..."):
+    if demo_mode:
+        df = generate_demo_data()
+        st.success("✅ Dati DEMO generati (Pattern Non-Lineare)!")
+    elif uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
+            df = df.dropna(how='all')
+        except Exception as e:
+            st.error(f"Errore: {e}")
 
 # 2. Elaborazione Completa (Se df esiste)
 if df is not None:
@@ -770,9 +800,10 @@ if df is not None:
             pivot_bt = pivot_bt.pivot(index=['Mese_Num', 'Mese'], columns='Anno', values='Accuratezza').sort_index()
             return pivot_bt
 
-        df_ml, ml_model, businesses_found = run_ml_forecast(df, mesi_prev, m_google, m_meta, sat_factor)
-        df_prophet, p_model = run_prophet_forecast(df, mesi_prev, m_google, m_meta, seasonal, businesses_found)
-        df_backtest = run_historical_backtest(df, businesses_found, 'Fatturato_Netto')
+        with st.spinner("🧠 Calcolo algoritmi predittivi e analisi in corso..."):
+            df_ml, ml_model, businesses_found = run_ml_forecast(df, mesi_prev, m_google, m_meta, sat_factor)
+            df_prophet, p_model = run_prophet_forecast(df, mesi_prev, m_google, m_meta, seasonal, businesses_found)
+            df_backtest = run_historical_backtest(df, businesses_found, 'Fatturato_Netto')
         
         # --- 6. VISUALIZZAZIONE TABS ---
         tabs = st.tabs([
@@ -789,6 +820,7 @@ if df is not None:
         
 
         with tabs[0]:
+            st.info("**Cosa fa:** Confronta tre metodologie (Heuristic, Machine Learning, Facebook Prophet) per prevedere il fatturato futuro basato sui piani di budget.  \n**Logica:** Allena gli algoritmi sui dati storici per capire l'impatto della spesa pubblicitaria e della stagionalità.")
             st.header("🔮 Advanced AI Forecasting: Battle of Models")
             
             with st.expander("📖 Guida ai Modelli: Cosa sto leggendo?"):
@@ -1002,6 +1034,7 @@ if df is not None:
                                 st.write("- 🚩 **Dato mancante**: L'AI non vede sconti o stock-out che potrebbero aver influenzato il risultato.")
 
         with tabs[1]:
+            st.info("**Cosa fa:** Analisi verticale delle performance di Google Ads (Spesa vs Valore Conversione).  \n**Logica:** Calcola metriche dinamiche come ROAS e CPC medio degli ultimi 30 giorni per misurare l'efficienza diretta del canale.")
             st.caption("Focus sulle performance storiche di Google Ads.")
             st.subheader("🔵 Performance Google Ads")
             if col_g_val in df.columns:
@@ -1016,6 +1049,7 @@ if df is not None:
                 st.dataframe(df[['Periodo', col_google, col_g_val, 'ROAS_Google', col_g_cpc]].iloc[::-1].style.format({col_google: '€ {:,.2f}', col_g_val: '€ {:,.2f}', 'ROAS_Google': '{:.2f}', col_g_cpc: '€ {:,.2f}'}))
 
         with tabs[2]:
+            st.info("**Cosa fa:** Analisi verticale delle performance di Meta Ads.  \n**Logica:** Monitora ROAS, CPM e frequenza per valutare la salute delle campagne social e l'impatto del pixel di tracciamento.")
             st.caption("Focus sulle performance storiche di Meta Ads.")
             st.subheader("🔵 Performance Meta Ads")
             if col_m_val in df.columns:
@@ -1030,6 +1064,7 @@ if df is not None:
                 st.dataframe(df[['Periodo', col_meta, col_m_val, 'ROAS_Meta', col_m_cpc, col_m_cpm, col_m_freq]].iloc[::-1].style.format({col_meta: '€ {:,.2f}', col_m_val: '€ {:,.2f}', 'ROAS_Meta': '{:.2f}', col_m_cpc: '€ {:,.2f}', col_m_cpm: '€ {:,.2f}', col_m_freq: '{:.2f}'}))
 
         with tabs[3]:
+            st.info("**Cosa fa:** Misura l'elasticità del business, ovvero quanto il fatturato reagisce alle variazioni di budget.  \n**Logica:** Analizza il rapporto tra incremento di spesa e incremento di ricavi per rilevare eventuali rendimenti decrescenti.")
             st.caption("Analisi dell'elasticità: misura quanto il fatturato reagisce alle variazioni di spesa pubblicitaria.")
             st.header("🧪 Analisi Saturazione e Scalabilità")
             st.subheader("1. Riepilogo Annuale Completo")
@@ -1087,6 +1122,7 @@ if df is not None:
                 st.pyplot(fig_sat)
 
         with tabs[4]:
+            st.info("**Cosa fa:** Monitora l'incidenza dei resi sul fatturato lordo per valutare la qualità delle vendite.  \n**Logica:** Applica una media mobile a 4 settimane per identificare trend strutturali e impatti sulla marginalità finale.")
             st.caption("Confronto tra spesa e resi.")
             st.subheader("🔍 Spesa Ads vs Tasso Resi")
             fig2, ax1_2 = plt.subplots(figsize=(12, 6))
@@ -1096,6 +1132,7 @@ if df is not None:
             st.pyplot(fig2)
 
         with tabs[5]:
+            st.info("**Cosa fa:** Visualizza il database normalizzato utilizzato per i calcoli.  \n**Logica:** È il risultato del processo di pulizia che trasforma i dati grezzi in numeri pronti per l'analisi statistica e il Machine Learning.")
             st.caption("Il database grezzo importato.")
             st.subheader("🗂️ Database Storico")
             display_cols = [col_date, 'Periodo', 'Total sales', col_google, col_g_val, col_g_cpc, col_g_imps, 
@@ -1105,6 +1142,7 @@ if df is not None:
 
         # --- 8. TAB AI AVANZATA ---
         with tabs[6]:
+            st.info("**Cosa fa:** Analisi automatica che assegna un punteggio di salute mensile al business.  \n**Logica:** Incrocia profitto, retention e performance dei canali utilizzando benchmark storici per generare alert e suggerimenti strategici.")
             st.caption("Analisi automatica che incrocia Profitto, Retention e Performance Canali.")
             st.header("🧠 Insight AI: Analisi Strategica Completa")
             
@@ -1181,6 +1219,7 @@ if df is not None:
                     """, unsafe_allow_html=True)
 
         with tabs[7]:
+            st.info("**Cosa fa:** Calcola il budget massimo sostenibile per il prossimo mese senza andare in perdita.  \n**Logica:** Applica il Break-Even ROAS alle previsioni di vendita per definire la roadmap di scalabilità più sicura.")
             st.header("🎯 Strategia di Scalabilità Safe")
             st.subheader("Pianificazione Budget Ads per il Prossimo Mese")
             
@@ -1241,6 +1280,7 @@ if df is not None:
                 st.error("Il profitto richiesto è troppo alto rispetto al fatturato previsto. Riduci l'obiettivo o aumenta i margini.")      
      
         with tabs[8]:
+            st.info("**Cosa fa:** Confronto Anno su Anno (YoY) per valutare la crescita strutturale del progetto.  \n**Logica:** Analizza metriche chiave come CPA, AOV e Retention Rate comparando periodi omogenei tra anni diversi.")
             st.header("🏥 Stato di Salute del Progetto (YoY)")
             
             years_avail = sorted(df['Year'].unique(), reverse=True)
@@ -1319,4 +1359,4 @@ if df is not None:
     except Exception as e:
         st.error(f"⚠️ Errore: {e}")
 else:
-    st.info("👋 Carica il file CSV per iniziare.")
+    st.info("👋 Carica il file CSV a sinistra per iniziare.")
