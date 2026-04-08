@@ -5,9 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
-import requests
 import logging
 
 # Disabilita log pesanti di Prophet
@@ -20,31 +18,48 @@ st.set_page_config(page_title="Forecasting Strategico Pro - DEMO", layout="wide"
 # STILE CSS PROFESSIONALE
 st.markdown("""
     <style>
-    /* 1. STILI BASE (LIGHT MODE) */
+    /* ===== LIGHT MODE (DEFAULT) ===== */
     .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e6e6e6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    div[data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; border: 1px solid #e1e4e8; }
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #e6e6e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    div[data-testid="stExpander"] {
+        background-color: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #e1e4e8;
+    }
     h1, h2, h3 { color: #2c3e50; }
     .ai-box { padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e0e0e0; color: #1e1e1e; }
     .ai-score-high { background-color: #f0fff4; border-left: 5px solid #48bb78; }
-    .ai-score-med { background-color: #fffaf0; border-left: 5px solid #ed8936; }
-    .ai-score-low { background-color: #fff5f5; border-left: 5px solid #f56565; }
+    .ai-score-med  { background-color: #fffaf0; border-left: 5px solid #ed8936; }
+    .ai-score-low  { background-color: #fff5f5; border-left: 5px solid #f56565; }
     .ai-alert { background-color: #fff5f5; color: #c53030; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.85em; border: 1px solid #feb2b2; }
     .ai-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-right: 5px; background-color: #e2e8f0; color: #4a5568; }
-{ background-color: #0e1117; }
-        .stMetric, div[data-testid="stExpander"] { background-color: #262730; border: 1px solid #464855; color: #ffffff; }
-        h1, h2, h3 { color: #ffffff !important; }
-        .ai-box { background-color: #1e1e1e; border-color: #464855; color: #ffffff; }
-        /* Varianti colori AI per Dark Mode per mantenere leggibilità */
-        .ai-score-high { background-color: #1a2e23; border-left: 5px solid #48bb78; }
-        .ai-score-med { background-color: #2d261e; border-left: 5px solid #ed8936; }
-        .ai-score-low { background-color: #2d1e1e; border-left: 5px solid #f56565; }
-        .ai-alert { background-color: #442a2a
-    /* 2. ADATTAMENTO PER DARK MODE (MAC/SYSTEM) */
-    @media (prefers-color-scheme: dark) {
-        .main ; color: #ff8080; border-color: #663333; }
-        .ai-tag { background-color: #313d4f; color: #e2e8f0; }
+
+    /* ===== DARK MODE (Streamlit) ===== */
+    [data-theme="dark"] .main { background-color: #0e1117; }
+    [data-theme="dark"] .stMetric {
+        background-color: #1e2130 !important;
+        border: 1px solid #2e3250 !important;
+        color: #ffffff !important;
     }
+    [data-theme="dark"] div[data-testid="stExpander"] {
+        background-color: #1e2130 !important;
+        border: 1px solid #2e3250 !important;
+    }
+    [data-theme="dark"] h1,
+    [data-theme="dark"] h2,
+    [data-theme="dark"] h3 { color: #e2e8f0 !important; }
+    [data-theme="dark"] .ai-box { background-color: #1a1d2e; border-color: #2e3250; color: #e2e8f0; }
+    [data-theme="dark"] .ai-score-high { background-color: #1a2e23; border-left: 5px solid #48bb78; }
+    [data-theme="dark"] .ai-score-med  { background-color: #2d261e; border-left: 5px solid #ed8936; }
+    [data-theme="dark"] .ai-score-low  { background-color: #2d1e1e; border-left: 5px solid #f56565; }
+    [data-theme="dark"] .ai-alert { background-color: #3d1f1f; color: #ff8080; border-color: #663333; }
+    [data-theme="dark"] .ai-tag { background-color: #2d3748; color: #e2e8f0; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -59,11 +74,26 @@ if 'last_uploaded_file' not in st.session_state: st.session_state.last_uploaded_
 # --- FUNZIONI DI UTILITÀ ---
 
 def clean_currency_us(column):
+    """Pulisce valute in formato US (1,200.50) o EU (1.200,50) -> float."""
     if column is None: return 0
-    s = column.astype(str)
-    s = s.str.replace('€', '', regex=False).str.strip()
-    s = s.str.replace(',', '', regex=False) 
-    return pd.to_numeric(s, errors='coerce').fillna(0)
+    s = column.astype(str).str.replace('\u20ac', '', regex=False).str.replace('$', '', regex=False).str.strip()
+    # Rilevamento automatico del formato: se la virgola appare DOPO il punto è formato US
+    # se il punto appare DOPO la virgola è formato EU
+    def parse_val(v):
+        v = v.strip()
+        comma_pos = v.rfind(',')
+        dot_pos = v.rfind('.')
+        if comma_pos > dot_pos:
+            # Formato EU: 1.234,56 -> rimuove punti, sostituisce virgola con punto
+            v = v.replace('.', '').replace(',', '.')
+        else:
+            # Formato US/standard: 1,234.56 -> rimuove virgole
+            v = v.replace(',', '')
+        try:
+            return float(v)
+        except:
+            return 0.0
+    return pd.to_numeric(s.apply(parse_val), errors='coerce').fillna(0)
 
 def parse_iso_week(week_str):
     try:
@@ -364,13 +394,22 @@ if df is not None:
     try:
         df.columns = df.columns.str.strip()
 
-        col_date = next((c for c in df.columns if 'Year Week' in c or 'Settimana' in c), None)
-        col_google = next((c for c in df.columns if 'Cost' in c), 'Cost')
-        col_meta = next((c for c in df.columns if 'Amount Spent' in c), 'Amount Spent')
-        col_sales = next((c for c in df.columns if 'Total sales' in c), 'Total sales')
-        col_returns = next((c for c in df.columns if 'Returns' in c), 'Returns')
-        col_orders = next((c for c in df.columns if 'Orders' in c), 'Orders')
-        col_aov = next((c for c in df.columns if 'Average order value' in c), 'Average order value')
+        # Rilevazione robusta colonne: priorita' a match esatto, fallback su contiene
+        def find_col(df, keywords_exact, keywords_contains, fallback):
+            for k in keywords_exact:
+                if k in df.columns: return k
+            for k in keywords_contains:
+                matches = [c for c in df.columns if k.lower() in c.lower()]
+                if matches: return matches[0]
+            return fallback
+
+        col_date = find_col(df, ['Year Week', 'Settimana'], ['year week', 'settimana'], None)
+        col_google = find_col(df, ['Cost'], [], 'Cost')  # Match esatto 'Cost' per evitare 'Cost per Click' ecc.
+        col_meta = find_col(df, ['Amount Spent'], ['amount spent'], 'Amount Spent')
+        col_sales = find_col(df, ['Total sales'], ['total sales'], 'Total sales')
+        col_returns = find_col(df, ['Returns'], ['returns'], 'Returns')
+        col_orders = find_col(df, ['Orders'], ['orders'], 'Orders')
+        col_aov = find_col(df, ['Average order value'], ['average order value'], 'Average order value')
         
         col_g_val = 'Conversions Value'
         col_m_val = 'Website Purchases Conversion Value'
@@ -412,22 +451,20 @@ if df is not None:
         df = df.fillna(0)
 
         df['Fatturato_Netto'] = df[col_sales].clip(lower=0)
+        # Spesa_Ads_Totale conserva il valore 0 (non NaN) per KPI e somme corrette
         df['Spesa_Ads_Totale'] = df[col_google] + df[col_meta]
-        df['Spesa_Ads_Totale'] = df['Spesa_Ads_Totale'].replace(0, np.nan)
-        df['MER'] = (df[col_sales] / df['Spesa_Ads_Totale']).fillna(0)
-        df['Tasso_Resi'] = (df[col_returns].abs() / df[col_sales].replace(0, np.nan)) * 100
-        df['Tasso_Resi'] = df['Tasso_Resi'].fillna(0)
+        # Versione sicura per divisioni (evita NaN cascade sui KPI)
+        spesa_safe = df['Spesa_Ads_Totale'].replace(0, np.nan)
+        df['MER'] = (df[col_sales] / spesa_safe).fillna(0)
+        df['Tasso_Resi'] = (df[col_returns].abs() / df[col_sales].replace(0, np.nan) * 100).fillna(0)
         
         # Calcolo CoS Storico
-        df['CoS'] = (df['Spesa_Ads_Totale'] / df['Fatturato_Netto'].replace(0, np.nan)) * 100
-        df['CoS'] = df['CoS'].fillna(0)
+        df['CoS'] = (df['Spesa_Ads_Totale'] / df['Fatturato_Netto'].replace(0, np.nan) * 100).fillna(0)
         
         # --- CALCOLO PROFITTO NETTO STIMATO NEL DF ---
         num_orders = df[col_orders] if col_orders in df.columns else (df['Fatturato_Netto'] / be_aov)
-        
-        # Profitto Operativo = (Numero Ordini * Profitto per Ordine) - Spesa Ads
-        # FIX: Uso la variabile corretta profit_order definita nella sidebar
-        df['Profitto_Operativo'] = (num_orders * profit_order) - df['Spesa_Ads_Totale']
+        # Profitto Operativo: usa la spesa_safe per il calcolo corretto (0 se nessuna spesa)
+        df['Profitto_Operativo'] = ((num_orders * profit_order) - df['Spesa_Ads_Totale']).fillna(0)
 
         # Inizializzazione sicura ROAS
         df['ROAS_Google'] = 0.0
@@ -435,17 +472,22 @@ if df is not None:
         if col_g_val in df.columns: df['ROAS_Google'] = df[col_g_val] / df[col_google].replace(0, np.nan).fillna(0)
         if col_m_val in df.columns: df['ROAS_Meta'] = df[col_m_val] / df[col_meta].replace(0, np.nan).fillna(0)
 
-        # --- AUTO-CALCOLO ELASTICITÀ ---
-        df_annual = df.groupby('Year').agg({'Spesa_Ads_Totale': 'sum', 'Fatturato_Netto': 'sum'}).sort_index()
-        suggested_saturation = 0.85 
-        if len(df_annual) >= 2:
-            last_year = df_annual.index[-1]
-            prev_year = df_annual.index[-2]
-            d_spend = (df_annual.loc[last_year, 'Spesa_Ads_Totale'] - df_annual.loc[prev_year, 'Spesa_Ads_Totale']) / df_annual.loc[prev_year, 'Spesa_Ads_Totale']
-            d_rev = (df_annual.loc[last_year, 'Fatturato_Netto'] - df_annual.loc[prev_year, 'Fatturato_Netto']) / df_annual.loc[prev_year, 'Fatturato_Netto']
-            if d_spend > 0.05:
+        # --- AUTO-CALCOLO ELASTICITÀ (solo su anni completi >= 48 settimane) ---
+        df_annual = df.groupby('Year').agg(
+            spesa=('Spesa_Ads_Totale', 'sum'),
+            fatturato=('Fatturato_Netto', 'sum'),
+            n_weeks=('Fatturato_Netto', 'count')
+        ).sort_index()
+        suggested_saturation = 0.85
+        anni_completi = df_annual[df_annual['n_weeks'] >= 48]
+        if len(anni_completi) >= 2:
+            last_year = anni_completi.index[-1]
+            prev_year = anni_completi.index[-2]
+            d_spend = (anni_completi.loc[last_year, 'spesa'] - anni_completi.loc[prev_year, 'spesa']) / anni_completi.loc[prev_year, 'spesa']
+            d_rev = (anni_completi.loc[last_year, 'fatturato'] - anni_completi.loc[prev_year, 'fatturato']) / anni_completi.loc[prev_year, 'fatturato']
+            if d_spend > 0.05 and d_rev != 0:
                 raw_elasticity = d_rev / d_spend
-                suggested_saturation = np.clip(raw_elasticity, 0.60, 1.0)
+                suggested_saturation = float(np.clip(raw_elasticity, 0.60, 1.0))
 
         # --- CALCOLO TREND YoY ---
         last_date = df['Data_Interna'].max()
@@ -568,16 +610,17 @@ if df is not None:
         # --- 4. DASHBOARD KPI (Status Attuale vs Precedente) ---
         st.divider()
         
-        # Ultime 4 settimane
-        last_4 = df.tail(4)
+        # Ultime 4 settimane (ordinate per data per sicurezza)
+        df_sorted = df.sort_values('Data_Interna')
+        last_4 = df_sorted.tail(4)
         tot_sales = last_4['Fatturato_Netto'].sum()
-        tot_ads = last_4['Spesa_Ads_Totale'].sum()
+        tot_ads = last_4['Spesa_Ads_Totale'].fillna(0).sum()
         mer_attuale = tot_sales / tot_ads if tot_ads > 0 else 0
         cos = (tot_ads / tot_sales * 100) if tot_sales > 0 else 0
-        profit = last_4['Profitto_Operativo'].sum()
+        profit = last_4['Profitto_Operativo'].fillna(0).sum()
 
         # 4 settimane ancora precedenti (per Delta)
-        prev_4 = df.iloc[-8:-4] if len(df) >= 8 else None
+        prev_4 = df_sorted.iloc[-8:-4] if len(df_sorted) >= 8 else None
         d_sales = d_ads = d_profit = d_mer = d_cos = d_aov = None
         
         if prev_4 is not None:
@@ -664,20 +707,23 @@ if df is not None:
         df['Lag_Sales_1'] = df['Fatturato_Netto'].shift(1)
         df['Lag_Sales_4'] = df['Fatturato_Netto'].shift(4)
 
-        df['Week_Num'] = df['Week'] # Per retrocompatibilità stagionale
+        df['Week_Num'] = df['Week']  # Per retrocompatibilità stagionale
         seasonal = df.groupby('Week_Num').agg({
             'Fatturato_Netto': 'mean', col_google: 'mean', col_meta: 'mean', col_orders: 'mean'
         }).reset_index()
 
-        avg_hist_sales = df['Fatturato_Netto'].mean()
-        
-        future_dates = pd.date_range(start=last_date + pd.Timedelta(weeks=1), periods=int(mesi_prev*4.34), freq='W-MON')
+        # Calcolo future_dates qui per passarlo come parametro esplicito al modello ML
+        future_dates_list = pd.date_range(
+            start=last_date + pd.Timedelta(weeks=1),
+            periods=int(mesi_prev * 4.34),
+            freq='W-MON'
+        )
 
         rows = []
-        for d in future_dates:
+        for d in future_dates_list:
             w = d.isocalendar().week
             base = seasonal[seasonal['Week_Num'] == w]
-            if base.empty: base = seasonal.mean().to_frame().T
+            if base.empty: base = seasonal.mean(numeric_only=True).to_frame().T
             
             # Trend applicato (Base storica + Slider)
             base_trend = (1 + growth_rate) * (1 + manual_trend)
@@ -717,67 +763,55 @@ if df is not None:
         df_prev['CoS Previsto'] = df_prev['CoS Previsto'].fillna(0)
 
         # --- 5.2 CALCOLO ML AVANZATO ---
-        def run_ml_forecast(df_hist, periods, g_scale, m_scale, sat, stress_mult):
-            # Prepariamo le feature
+        def run_ml_forecast(df_hist, future_df, g_scale, m_scale, sat, stress_mult):
+            """Proiezione con Random Forest. future_df è il DataFrame Heuristic già calcolato."""
             df_train = df_hist.copy()
             
-            # Feature critiche: Solo i "DRIVER" (quello che conosciamo o possiamo stimare)
+            # Feature critiche
             features_list = ['Week_Sin', 'Week_Cos', col_google, col_meta, 'Lag_Sales_1', 'Lag_Sales_4']
-            
-            # DRIVER DI EFFICIENZA (Influenzano il risultato ma non lo contengono)
             driver_metrics = [
                 'Average order value', 'Returning customer rate', 'Discounts',
-                'Avg. CPC', 'CPC (All)', 'CPM (Cost per 1,000 Impressions)', 'sessions', 'Frequency'
+                'Avg. CPC', 'CPC (All)', 'CPM (Cost per 1,000 Impressions)', 'Frequency'
             ]
             valid_drivers = [m for m in driver_metrics if m in df_train.columns]
             features_list += valid_drivers
             
-            # METRICHE DI RISULTATO (Sola diagnostica, rimosse dal forecast futuro per evitare pacchi)
-            result_metrics = ['Conversions Value', 'Website Purchases Conversion Value', 'Orders', 'Items', 'Returns']
-            
-            # Gestione NaNs
             for f in features_list:
                 if f in df_train.columns:
                     df_train[f] = df_train[f].fillna(df_train[f].median())
             
             df_train = df_train.dropna(subset=['Fatturato_Netto'])
+            if len(df_train) < 10:
+                return pd.DataFrame(), None, valid_drivers
+
             X = df_train[features_list]
             y = df_train['Fatturato_Netto']
             
-            # Modello più conservativo (meno profondità, più alberi)
             model = RandomForestRegressor(n_estimators=300, max_depth=6, min_samples_leaf=3, random_state=42, n_jobs=-1)
             model.fit(X, y)
             
-            # Per il futuro, usiamo le medie delle ultime 4 settimane (più reattive al post-festività)
             avg_metrics = {m: df_hist[m].tail(4).mean() for m in valid_drivers}
-
-            # Proiezione
             curr_sales_lag1 = df_hist['Fatturato_Netto'].iloc[-1]
-            curr_sales_lag4 = df_hist['Fatturato_Netto'].iloc[-4]
+            curr_sales_lag4 = df_hist['Fatturato_Netto'].iloc[-4] if len(df_hist) >= 4 else curr_sales_lag1
             ml_rows = []
             
-            for i in range(len(df_prev)):
-                d = df_prev.iloc[i]['Data']
+            for i in range(len(future_df)):
+                d = future_df.iloc[i]['Data']
                 w = d.isocalendar().week
                 w_sin, w_cos = np.sin(2 * np.pi * w / 53), np.cos(2 * np.pi * w / 53)
-                
                 row_pred = {
                     'Week_Sin': w_sin, 'Week_Cos': w_cos,
-                    col_google: df_prev.iloc[i]['Google Previsto'],
-                    col_meta: df_prev.iloc[i]['Meta Previsto'],
+                    col_google: future_df.iloc[i]['Google Previsto'],
+                    col_meta: future_df.iloc[i]['Meta Previsto'],
                     'Lag_Sales_1': curr_sales_lag1, 'Lag_Sales_4': curr_sales_lag4
                 }
-                # Aggiungiamo le medie storiche per i parametri extra
                 row_pred.update(avg_metrics)
-                
-                X_pred = pd.DataFrame([row_pred])[features_list] # Assicura ordine colonne
-                # Applichiamo lo STRESS MULTIPLIER al risultato della previsione
+                X_pred = pd.DataFrame([row_pred])[features_list]
                 pred_sales = model.predict(X_pred)[0] * stress_mult
-                
                 curr_sales_lag4 = curr_sales_lag1
                 curr_sales_lag1 = pred_sales
-                
-                ml_rows.append({'Data': d, 'Fatturato_ML': pred_sales, 'Spesa_ML': row_pred[col_google] + row_pred[col_meta]})
+                ml_rows.append({'Data': d, 'Fatturato_ML': pred_sales,
+                                'Spesa_ML': row_pred[col_google] + row_pred[col_meta]})
             
             return pd.DataFrame(ml_rows), model, valid_drivers
 
@@ -830,7 +864,12 @@ if df is not None:
             for col in ['yhat', 'yhat_lower', 'yhat_upper']:
                 forecast[col] = forecast[col] * stress_mult
             
-            return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(len(future) - hist_len), m, forecast[['ds', 'yhat']].head(hist_len)
+            # Estrazione sicura: solo date > storico reale
+            is_future = forecast['ds'] > df_p['ds'].max()
+            df_forecast_future = forecast[is_future][['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
+            df_forecast_hist = forecast[~is_future][['ds', 'yhat']].copy()
+            
+            return df_forecast_future, m, df_forecast_hist
 
         def run_historical_backtest(df_hist, drivers, target_col, seasonal_df, prophet_hist_df=None):
             backtest_results = []
@@ -914,7 +953,7 @@ if df is not None:
             return pd.DataFrame(backtest_results) if backtest_results else None
 
         with st.spinner("🧠 Calcolo algoritmi predittivi e analisi in corso..."):
-            df_ml, ml_model, businesses_found = run_ml_forecast(df, mesi_prev, m_google, m_meta, sat_factor, stress_total_mult)
+            df_ml, ml_model, businesses_found = run_ml_forecast(df, df_prev, m_google, m_meta, sat_factor, stress_total_mult)
             df_prophet, p_model, df_prophet_hist = run_prophet_forecast(df, mesi_prev, m_google, m_meta, seasonal, businesses_found, stress_total_mult)
             df_backtest = run_historical_backtest(df, businesses_found, 'Fatturato_Netto', seasonal, df_prophet_hist)
         
@@ -1039,6 +1078,59 @@ if df is not None:
                 
                 st.metric("Fatturato Totale Previsto (Ensemble)", f"€ {ensemble_total:,.0f}", 
                           help="Questa è la media ponderata tra l'impatto del budget e la stagionalità. È il dato più affidabile per pianificare il cashflow.")
+                
+                st.divider()
+                st.info(f"🔮 **Inizio Previsioni:** Dalla settimana del **{(last_date + pd.Timedelta(weeks=1)).strftime('%d %b %Y')}** ({mesi_prev} mesi)")
+                
+                viz_mode = st.radio("Seleziona dettaglio tabella:", ["Mensile", "Settimanale"], horizontal=True, key="forecast_viz")
+                
+                # Sincronizzazione e normalizzazione date per il merge
+                df_p_m = df_prev[['Data', 'Fatturato Previsto']].copy()
+                df_p_m['Data'] = pd.to_datetime(df_p_m['Data']).dt.normalize()
+                
+                df_m_m = df_ml[['Data', 'Fatturato_ML']].copy()
+                df_m_m['Data'] = pd.to_datetime(df_m_m['Data']).dt.normalize()
+                
+                df_pr_m = df_prophet[['ds', 'yhat']].copy()
+                df_pr_m['Data'] = pd.to_datetime(df_pr_m['ds']).dt.normalize()
+                
+                # Unificazione dati settimanali con merge robusto
+                df_all_w = df_p_m.rename(columns={'Fatturato Previsto': 'Heuristic'})
+                df_all_w = df_all_w.merge(df_m_m.rename(columns={'Fatturato_ML': 'Random Forest (Budget)'}), on='Data', how='left')
+                df_all_w = df_all_w.merge(df_pr_m[['Data', 'yhat']].rename(columns={'yhat': 'Prophet (Season)'}), on='Data', how='left')
+                
+                # Calcolo Ensemble (Media che ignora i NaN per sicurezza operativa)
+                df_all_w['Ensemble (Consigliato)'] = df_all_w[['Random Forest (Budget)', 'Prophet (Season)']].mean(axis=1)
+                
+                if viz_mode == "Settimanale":
+                    st.markdown("##### 📅 Tabella Comparativa Previsionale (Settimanale)")
+                    df_display = df_all_w.copy()
+                    df_display['Data'] = df_display['Data'].dt.strftime('%d-%m-%Y')
+                    st.dataframe(df_display.style.format({
+                        'Heuristic': '€ {:,.0f}',
+                        'Random Forest (Budget)': '€ {:,.0f}',
+                        'Prophet (Season)': '€ {:,.0f}',
+                        'Ensemble (Consigliato)': '€ {:,.0f}'
+                    }), use_container_width=True)
+                else:
+                    st.markdown("##### 📅 Tabella Comparativa Previsionale (Mensile)")
+                    # Aggregazione mensile intelligente
+                    df_all_w['Mese'] = df_all_w['Data'].dt.to_period('M').astype(str)
+                    df_summary_m = df_all_w.groupby('Mese').agg({
+                        'Heuristic': 'sum',
+                        'Random Forest (Budget)': 'sum',
+                        'Prophet (Season)': 'sum',
+                        'Ensemble (Consigliato)': 'sum'
+                    }).reset_index()
+                    
+                    st.dataframe(df_summary_m.style.format({
+                        'Heuristic': '€ {:,.0f}',
+                        'Random Forest (Budget)': '€ {:,.0f}',
+                        'Prophet (Season)': '€ {:,.0f}',
+                        'Ensemble (Consigliato)': '€ {:,.0f}'
+                    }), use_container_width=True)
+
+                st.divider()
                 
                 diff_pct = abs(rf_total - p_total) / min(rf_total, p_total)
                 optimistic_model = "Machine Learning (Budget Focus)" if rf_total > p_total else "Prophet (Stagionalità)"
@@ -2028,10 +2120,14 @@ Saturazione:   {rec_sat:.2f}
                 
                 # Dati Meteo Sintetizzati (da cache o chiamata ridotta)
                 # Per velocità usiamo dati aggregati da Milano/Roma come proxy nazionale
-                city_w = weather_full_df[pd.to_datetime(weather_full_df['Date']).dt.to_period('M') == m_start.strftime('%Y-%m')]
+                if not weather_full_df.empty and 'Date' in weather_full_df.columns:
+                    city_w = weather_full_df[pd.to_datetime(weather_full_df['Date']).dt.to_period('M') == m_start.strftime('%Y-%m')]
+                else:
+                    city_w = pd.DataFrame()
+                
                 if not city_w.empty:
                     avg_t = city_w['temp'].mean()
-                    sum_r = city_w['rain'].mean() # Media delle città per avere un'idea nazionale
+                    sum_r = city_w['rain'].mean() 
                 else:
                     avg_t, sum_r = 15.0, 40.0 # Fallback
                 
