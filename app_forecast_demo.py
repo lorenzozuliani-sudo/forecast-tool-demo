@@ -6,7 +6,9 @@ import seaborn as sns
 from datetime import datetime, timedelta
 from sklearn.ensemble import RandomForestRegressor
 from prophet import Prophet
+import requests
 import logging
+import yfinance as yf
 
 # Disabilita log pesanti di Prophet
 logging.getLogger('prophet').setLevel(logging.ERROR)
@@ -80,6 +82,7 @@ def clean_currency_us(column):
     # Rilevamento automatico del formato: se la virgola appare DOPO il punto è formato US
     # se il punto appare DOPO la virgola è formato EU
     def parse_val(v):
+        if not isinstance(v, str): return 0.0
         v = v.strip()
         comma_pos = v.rfind(',')
         dot_pos = v.rfind('.')
@@ -116,6 +119,36 @@ def clean_percentage(val):
     s = str(val).replace('%', '').strip()
     try: return float(s)
     except: return 0.0
+
+@st.cache_data(ttl=3600)
+def fetch_global_signals():
+    """Recupera segnali geopolitici ed economici reali via Yahoo Finance."""
+    symbols = {
+        'Oil': 'BZ=F',    # Brent Crude Oil (Logistica/Energia)
+        'VIX': '^VIX',    # Volatility Index (Paura/Sentiment)
+        'Gold': 'GC=F',   # Gold (Bene Rifugio/Guerra)
+        'DXY': 'DX-Y.NYB' # US Dollar Index (Forza Valuta)
+    }
+    data = {}
+    for name, sym in symbols.items():
+        try:
+            ticker = yf.Ticker(sym)
+            hist = ticker.history(period="1y") # Recuperiamo 1 anno per il ledger
+            if not hist.empty:
+                current = hist['Close'].iloc[-1]
+                prev_7d = hist['Close'].iloc[-7] if len(hist) >= 7 else current
+                prev_30d = hist['Close'].iloc[0]
+                trend_7d = (current - prev_7d) / prev_7d
+                trend_30d = (current - prev_30d) / prev_30d
+                data[name] = {
+                    'current': current,
+                    'trend_7d': trend_7d,
+                    'trend_30d': trend_30d,
+                    'history': hist['Close']
+                }
+        except:
+            pass
+    return data
 
 def generate_demo_data():
     """Genera dati casuali ma realistici per la demo (2020-2026)."""
@@ -599,8 +632,27 @@ if df is not None:
             Usa questi slider per capire quanto è **resiliente** il tuo business. 
             Cosa succede se i costi salgono o le persone convertono meno?
             """)
-            cpm_stress = st.slider("Aumento Costi Pubblicitari (CPM/CPC %)", 0, 100, 0, help="Simula un aumento dei costi di acquisizione a parità di budget.")
-            cr_stress = st.slider("Calo Tasso di Conversione (%)", 0, 50, 0, help="Simula un calo dell'efficacia del sito o della propensione all'acquisto.")
+            
+            # --- INTEGRAZIONE SEGNALI REALI NELLO STRESS TEST ---
+            risk_signals = fetch_global_signals()
+            if risk_signals:
+                oil_risk = risk_signals.get('Oil', {}).get('trend_7d', 0)
+                vix_risk = risk_signals.get('VIX', {}).get('trend_7d', 0)
+                
+                if oil_risk > 0.05 or vix_risk > 0.10:
+                    st.error(f"⚡ **Segnale di Rischio Rilevato!**")
+                    if oil_risk > 0.05: st.caption(f"Petrolio: +{oil_risk:.1%} (7gg)")
+                    if vix_risk > 0.10: st.caption(f"Volatilità: +{vix_risk:.1%} (7gg)")
+                    if st.button("🚀 Auto-Applica Stress"):
+                        cpm_val = int(min(100, (oil_risk * 100) * 2))
+                        cr_val = int(min(50, (vix_risk * 100) * 1.5))
+                        # Nota: Questi slider sono definiti sotto, quindi usiamo session_state
+                        st.session_state['cpm_stress_slider'] = cpm_val
+                        st.session_state['cr_stress_slider'] = cr_val
+                        st.rerun()
+
+            cpm_stress = st.slider("Aumento Costi Pubblicitari (CPM/CPC %)", 0, 100, 0, key="cpm_stress_slider", help="Simula un aumento dei costi di acquisizione a parità di budget.")
+            cr_stress = st.slider("Calo Tasso di Conversione (%)", 0, 50, 0, key="cr_stress_slider", help="Simula un calo dell'efficacia del sito o della propensione all'acquisto.")
         
         # Trasformiamo in moltiplicatori (es. +20% CPM -> 0.83x efficacia spesa; -10% CR -> 0.90x fatturato)
         cpm_mult = 1 / (1 + (cpm_stress / 100))
@@ -1208,7 +1260,7 @@ if df is not None:
                         p_acc = df_backtest.groupby(['Mese', 'Anno', 'Mese_Num'])[[config["acc_col"]]].mean().reset_index()
                         p_acc = p_acc.pivot(index=['Mese_Num', 'Mese'], columns='Anno', values=config["acc_col"]).sort_index()
                         st.dataframe(p_acc.style.format("{:.1%}") \
-                                   .applymap(style_acc), use_container_width=True)
+                                   .map(style_acc), use_container_width=True)
                         
                         # Tabella Errore
                         st.markdown(f"**💶 Scostamento {config['name']} (€)**")
@@ -1255,7 +1307,7 @@ if df is not None:
                     else: color = '#e67e22' # Heuristic
                     return f'background-color: {color}; color: white; font-weight: bold'
 
-                st.dataframe(pivot_win.style.applymap(color_winner), use_container_width=True)
+                st.dataframe(pivot_win.style.map(color_winner), use_container_width=True)
                 
                 # Summary Vincitori
                 top_winner = df_backtest['Vincente'].mode()[0]
@@ -1973,11 +2025,56 @@ Saturazione:   {rec_sat:.2f}
                 """)
 
         with tabs[9]:
-            st.header("🌍 Market Intelligence: Weather Timeline")
+            st.header("🌍 Market Intelligence: Geopolitical Risk Watch")
             st.info("""
-            **Sincronizzazione Eventi:** Questa sezione analizza come i fattori climatici hanno influenzato le tue vendite giorno per giorno. 
-            Sposta lo slider per vedere l'evoluzione del meteo sull'Italia in tempo reale.
+            **Sincronizzazione Eventi:** Questa sezione analizza come i fattori macroeconomici e geopolitici influenzano il mercato. 
+            I dati sono recuperati in tempo reale dai mercati globali.
             """)
+            
+            risk_data = fetch_global_signals()
+            if risk_data:
+                col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+                
+                # Metrics
+                if 'Oil' in risk_data:
+                    col_r1.metric("Brent Oil", f"${risk_data['Oil']['current']:.2f}", f"{risk_data['Oil']['trend_7d']:+.1%}")
+                if 'VIX' in risk_data:
+                    col_r2.metric("Fear Index (VIX)", f"{risk_data['VIX']['current']:.2f}", f"{risk_data['VIX']['trend_7d']:+.1%}", delta_color="inverse")
+                if 'Gold' in risk_data:
+                    col_r3.metric("Gold", f"${risk_data['Gold']['current']:.1f}", f"{risk_data['Gold']['trend_7d']:+.1%}")
+                if 'DXY' in risk_data:
+                    col_r4.metric("Dollar Index", f"{risk_data['DXY']['current']:.2f}", f"{risk_data['DXY']['trend_7d']:+.1%}")
+                
+                st.divider()
+                
+                # Charts
+                st.subheader("📈 Trend Mercati negli ultimi 30 giorni")
+                chart_col1, chart_col2 = st.columns(2)
+                with chart_col1:
+                    st.write("**Petrolio Brent**")
+                    st.line_chart(risk_data['Oil']['history'] if 'Oil' in risk_data else None)
+                    st.caption("📦 **Costi Logistica:** L'aumento del petrolio è un indicatore diretto di rincari nei trasporti e nelle tariffe di spedizione per il tuo e-commerce.")
+                with chart_col2:
+                    st.write("**VIX Index**")
+                    st.line_chart(risk_data['VIX']['history'] if 'VIX' in risk_data else None)
+                    st.caption("🧠 **Sentiment Consumatori:** Un VIX alto indica incertezza e paura; in questi periodi il tasso di conversione tende a calare a causa della minor fiducia degli acquirenti.")
+                
+                # AI Geopolitical Commentary
+                st.subheader("🤖 Analisi AI del Rischio Geopolitico")
+                
+                recent_oil = risk_data['Oil']['trend_7d'] if 'Oil' in risk_data else 0
+                recent_vix = risk_data['VIX']['trend_7d'] if 'VIX' in risk_data else 0
+                
+                if recent_oil > 0.08:
+                    st.error(f"**ALERT GUERRA/LOGISTICA:** Il forte aumento del petrolio (+{recent_oil:.1%}) suggerisce possibili blocchi alle rotte commerciali o rincari dei trasporti. Proteggi i margini aumentando il prezzo medio o ottimizzando la logistica.")
+                elif recent_vix > 0.15:
+                    st.warning(f"**ALERT SENTIMENT:** L'indice della paura è balzato del {recent_vix:.1%}. Gli utenti tendono a ritardare gli acquisti non necessari. Considera di spingere prodotti 'essenziali' o offerte di valore.")
+                else:
+                    st.success("✅ **Stabilità Macro:** Non si rilevano scossoni geopolitici critici nelle ultime 72 ore. Scenario favorevole allo scale-up del budget.")
+            
+            st.divider()
+            st.subheader("🌦️ Weather Intelligence (Dati Storici)")
+            st.info("Sposta lo slider per vedere l'evoluzione del meteo sull'Italia in tempo reale.")
 
             # 1. Recupero date totali dal CSV
             full_start = df['Data_Interna'].min()
@@ -2008,7 +2105,7 @@ Saturazione:   {rec_sat:.2f}
                 
                 all_days_data = []
                 try:
-                    resp = requests.get(url, timeout=15).json()
+                    resp = requests.get(url, timeout=16).json()
                     if not isinstance(resp, list): resp = [resp]
                     
                     for i, (city, coords) in enumerate(cities.items()):
@@ -2108,47 +2205,72 @@ Saturazione:   {rec_sat:.2f}
                 m_start = row['Data_Interna'].replace(day=1)
                 m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
                 
-                # Cerchiamo eventi nel mese
-                m_events = [ev['title'] for ev in events_template if ev['month'] == m_start.month]
-                event_str = ", ".join(m_events) if m_events else "Nessun evento"
-                
-                # Macro/Inflazione Proxy (Logica ISTAT 2024-25)
-                # Simulo un sentiment basato sul periodo storico
-                inflazione = "1.2%" # Baseline Italia
-                if m_start.year == 2024 and m_start.month > 9: inflazione = "0.7% (Deflazione)"
-                elif m_start.year == 2025: inflazione = "1.0% (Stabile)"
-                
-                # Dati Meteo Sintetizzati (da cache o chiamata ridotta)
-                # Per velocità usiamo dati aggregati da Milano/Roma come proxy nazionale
+                # Dati Meteo Sintetizzati
                 if not weather_full_df.empty and 'Date' in weather_full_df.columns:
                     city_w = weather_full_df[pd.to_datetime(weather_full_df['Date']).dt.to_period('M') == m_start.strftime('%Y-%m')]
                 else:
                     city_w = pd.DataFrame()
                 
                 if not city_w.empty:
-                    avg_t = city_w['temp'].mean()
-                    sum_r = city_w['rain'].mean() 
+                    avg_t, sum_r = city_w['temp'].mean(), city_w['rain'].mean() 
                 else:
-                    avg_t, sum_r = 15.0, 40.0 # Fallback
+                    avg_t, sum_r = 15.0, 40.0
+
+                # --- INTEGRAZIONE DATI MERCATO NEL LEDGER ---
+                oil_m_avg = vix_m_avg = 0.0
+                if risk_data:
+                    if 'Oil' in risk_data:
+                        h_oil = risk_data['Oil']['history']
+                        m_oil = h_oil[h_oil.index.to_period('M') == m_start.strftime('%Y-%m')]
+                        oil_m_avg = m_oil.mean() if not m_oil.empty else 0
+                    if 'VIX' in risk_data:
+                        h_vix = risk_data['VIX']['history']
+                        m_vix = h_vix[h_vix.index.to_period('M') == m_start.strftime('%Y-%m')]
+                        vix_m_avg = m_vix.mean() if not m_vix.empty else 0
+
+                # --- ANALISI DINAMICA DEL CONTESTO (GEOPOLITICA & MERCATI) ---
+                mkt_sentiment = "✅ Stabile"
+                if vix_m_avg > 28: mkt_sentiment = "🚨 Panico/Crisi"
+                elif vix_m_avg > 22: mkt_sentiment = "⚠️ Alta Incertezza"
+                elif vix_m_avg > 18: mkt_sentiment = "🔸 Volatilità Moderata"
+                
+                logistics_status = "🟢 Standard"
+                if oil_m_avg > 92: logistics_status = "🚨 Shock Prezzi Petrolio"
+                elif oil_m_avg > 85: logistics_status = "⚠️ Costi Logistica ↑"
+                
+                # Eventi commerciali
+                m_events = [ev['title'] for ev in events_template if ev['month'] == m_start.month]
+                event_str = m_events[0] if m_events else "Nessun Evento"
                 
                 correlation_rows.append({
                     'Mese': row['Month_Year'],
                     'Fatturato': row['Fatturato_Netto'],
                     'Spesa Ads': row['Spesa_Ads_Totale'],
                     'MER': row['MER'],
-                    'Temp Media': f"{avg_t:.1f}°C",
-                    'Pioggia': f"{sum_r:.0f} mm",
-                    'Contesto Esterno': f"{event_str} | Infl. {inflazione}"
+                    'Temp Media': avg_t,
+                    'Petrolio (Avg)': oil_m_avg,
+                    'VIX (Avg)': vix_m_avg,
+                    'Contesto Esterno': f"{event_str} | {mkt_sentiment} | {logistics_status}"
                 })
             
             ledger_df = pd.DataFrame(correlation_rows)
             
             # Styling della tabella
-            st.dataframe(ledger_df.style.format({
-                'Fatturato': '€ {:,.0f}',
-                'Spesa Ads': '€ {:,.0f}',
-                'MER': '{:.2f}'
-            }).background_gradient(subset=['MER'], cmap='RdYlGn', vmin=monthly_biz['MER'].min(), vmax=monthly_biz['MER'].max()), use_container_width=True)
+            st.dataframe(
+                ledger_df.style.format({
+                    'Fatturato': '€ {:,.0f}',
+                    'Spesa Ads': '€ {:,.0f}',
+                    'MER': '{:.2f}',
+                    'Temp Media': '{:.1f}°C',
+                    'Petrolio (Avg)': '${:.2f}',
+                    'VIX (Avg)': '{:.2f}'
+                })
+                .background_gradient(subset=['MER'], cmap='RdYlGn', vmin=monthly_biz['MER'].min(), vmax=monthly_biz['MER'].max())
+                .background_gradient(subset=['Petrolio (Avg)'], cmap='YlOrRd')
+                .background_gradient(subset=['VIX (Avg)'], cmap='YlOrRd')
+                .background_gradient(subset=['Temp Media'], cmap='coolwarm')
+                , use_container_width=True
+            )
             
             # --- CONCLUSIONI AUTOMATICHE ---
             st.subheader("💡 Verdetto di Correlazione")
