@@ -6,3 +6,5 @@ matplotlib
 scikit-learn
 prophet
 statsmodels
+yfinance
+requests
