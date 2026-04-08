@@ -20,48 +20,100 @@ st.set_page_config(page_title="Forecasting Strategico Pro - DEMO", layout="wide"
 # STILE CSS PROFESSIONALE
 st.markdown("""
     <style>
-    /* ===== LIGHT MODE (DEFAULT) ===== */
-    .main { background-color: #f8f9fa; }
-    .stMetric {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #e6e6e6;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    /* ===== PREMIUM UNIVERSAL STYLING ===== */
+    :root {
+        --glass-bg: rgba(255, 255, 255, 0.03);
+        --glass-border: rgba(255, 255, 255, 0.1);
     }
-    div[data-testid="stExpander"] {
-        background-color: #ffffff;
-        border-radius: 10px;
-        border: 1px solid #e1e4e8;
-    }
-    h1, h2, h3 { color: #2c3e50; }
-    .ai-box { padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e0e0e0; color: #1e1e1e; }
-    .ai-score-high { background-color: #f0fff4; border-left: 5px solid #48bb78; }
-    .ai-score-med  { background-color: #fffaf0; border-left: 5px solid #ed8936; }
-    .ai-score-low  { background-color: #fff5f5; border-left: 5px solid #f56565; }
-    .ai-alert { background-color: #fff5f5; color: #c53030; padding: 8px; border-radius: 5px; margin-top: 10px; font-size: 0.85em; border: 1px solid #feb2b2; }
-    .ai-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-right: 5px; background-color: #e2e8f0; color: #4a5568; }
 
-    /* ===== DARK MODE (Streamlit) ===== */
-    [data-theme="dark"] .main { background-color: #0e1117; }
-    [data-theme="dark"] .stMetric {
-        background-color: #1e2130 !important;
-        border: 1px solid #2e3250 !important;
-        color: #ffffff !important;
+    .main {
+        background-color: var(--background-color);
+        color: var(--text-color);
     }
-    [data-theme="dark"] div[data-testid="stExpander"] {
-        background-color: #1e2130 !important;
-        border: 1px solid #2e3250 !important;
+
+    /* Metric Cards Premium Look */
+    [data-testid="stMetric"] {
+        background: var(--secondary-background-color);
+        padding: 20px !important;
+        border-radius: 15px !important;
+        border: 1px solid var(--glass-border) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    [data-theme="dark"] h1,
-    [data-theme="dark"] h2,
-    [data-theme="dark"] h3 { color: #e2e8f0 !important; }
-    [data-theme="dark"] .ai-box { background-color: #1a1d2e; border-color: #2e3250; color: #e2e8f0; }
-    [data-theme="dark"] .ai-score-high { background-color: #1a2e23; border-left: 5px solid #48bb78; }
-    [data-theme="dark"] .ai-score-med  { background-color: #2d261e; border-left: 5px solid #ed8936; }
-    [data-theme="dark"] .ai-score-low  { background-color: #2d1e1e; border-left: 5px solid #f56565; }
-    [data-theme="dark"] .ai-alert { background-color: #3d1f1f; color: #ff8080; border-color: #663333; }
-    [data-theme="dark"] .ai-tag { background-color: #2d3748; color: #e2e8f0; }
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border-color: var(--primary-color) !important;
+    }
+
+    /* Expander Fix & Design */
+    div[data-testid="stExpander"] {
+        background-color: var(--secondary-background-color) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 12px !important;
+        margin-bottom: 1rem !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    div[data-testid="stExpanderSummary"] {
+        padding: 1rem !important;
+    }
+
+    /* AI Insight Boxes - Adaptive Colors */
+    .ai-box {
+        padding: 24px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        border: 1px solid var(--glass-border);
+        color: var(--text-color) !important;
+        backdrop-filter: blur(10px);
+        background-color: var(--secondary-background-color);
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
+    }
+    
+    .ai-score-high { border-left: 6px solid #48bb78 !important; background-color: rgba(72, 187, 120, 0.1) !important; }
+    .ai-score-med  { border-left: 6px solid #ed8936 !important; background-color: rgba(237, 137, 54, 0.1) !important; }
+    .ai-score-low  { border-left: 6px solid #f56565 !important; background-color: rgba(245, 101, 101, 0.1) !important; }
+
+    .ai-alert {
+        background-color: rgba(197, 48, 48, 0.1);
+        color: #f56565 !important;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(197, 48, 48, 0.2);
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .ai-tag {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75em;
+        font-weight: 600;
+        margin-right: 8px;
+        background-color: var(--secondary-background-color);
+        border: 1px solid var(--glass-border);
+        color: var(--text-color);
+    }
+
+    /* Professional Sidebar */
+    .stSidebar {
+        background-color: var(--secondary-background-color) !important;
+    }
+
+    /* Typography Upgrades */
+    h1, h2, h3 {
+        color: var(--text-color) !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.02em;
+    }
+
+    /* Improve form elements visual consistency */
+    .stTextInput input, .stNumberInput input, .stSelectbox select {
+        border-radius: 8px !important;
+        border: 1px solid var(--glass-border) !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -119,6 +171,17 @@ def clean_percentage(val):
     s = str(val).replace('%', '').strip()
     try: return float(s)
     except: return 0.0
+
+def format_euro(val, precision=0):
+    if pd.isna(val) or val is None: return "€ 0"
+    s = f"{val:,.{precision}f}"
+    return "€ " + s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+def format_num_eu(val, precision=2, delta=False):
+    if pd.isna(val) or val is None: return "0"
+    prefix = "+" if delta and val > 0 else ""
+    s = f"{val:,.{precision}f}"
+    return prefix + s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 @st.cache_data(ttl=3600)
 def fetch_global_signals():
@@ -352,26 +415,26 @@ with st.sidebar.expander("2. Output Calcolati (Live)", expanded=True):
     st.caption("Questi sono i risultati derivati dai tuoi input. Calcolano quanto valore genera ogni ordine/cliente e definiscono i tuoi limiti di spesa (Break-Even) per il simulatore.")
     st.markdown("---")
     
-    st.markdown(f"**AOV (Netto)**: € {aov_post_tax_returns:.2f}")
+    st.markdown(f"**AOV (Netto)**: {format_euro(aov_post_tax_returns, 2)}")
     st.caption("Formula: `(AOV * (1-Resi)) / (1+IVA)`")
     
-    st.markdown(f"**Profitto/Ordine**: € {profit_order:.2f}")
+    st.markdown(f"**Profitto/Ordine**: {format_euro(profit_order, 2)}")
     st.caption("Formula: `(AOV Netto * Margine%) - Spedizioni`")
     
-    st.markdown(f"**Profitto/Cliente**: € {profit_per_customer:.2f}")
+    st.markdown(f"**Profitto/Cliente**: {format_euro(profit_per_customer, 2)}")
     st.caption("Formula: `Profitto Ordine + Valore Ricorsivo`")
     
     st.markdown("---")
     
     st.metric(
         "🎯 Break-Even CPA", 
-        f"€ {be_cpa:.2f}",
+        format_euro(be_cpa, 2),
         help="Costo per Acquisizione massimo sostenibile. Se spendi più di così per acquisire un cliente, sei in perdita."
     )
     
     st.metric(
         "🎯 Break-Even ROAS", 
-        f"{be_roas_val*100:.0f}% ({be_roas_val:.2f})",
+        f"{format_num_eu(be_roas_val*100, 0)}% ({format_num_eu(be_roas_val, 2)})",
         help="Ritorno sulla spesa pubblicitaria minimo necessario. Formula: `AOV / Break Even CPA`."
     )
 
@@ -697,11 +760,11 @@ if df is not None:
 
         st.subheader("📊 Analisi Performance Recente (Last 4w)")
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Fatturato (4w)", f"€ {tot_sales:,.0f}", delta=d_sales)
-        c2.metric("Spesa Ads (4w)", f"€ {tot_ads:,.0f}", delta=d_ads, delta_color="inverse")
-        c3.metric("MER / BE", f"{mer_attuale:.2f} / {be_roas_val:.2f}", delta=f"{mer_attuale-be_roas_val:.2f} (vs BE)")
-        c4.metric("CoS (Spesa/Ricavi)", f"{cos:.1f}%", delta=d_cos, delta_color="inverse")
-        c5.metric("Profitto Stimato", f"€ {profit:,.0f}", delta=d_profit, help="Profitto Operativo netto stimato.")
+        c1.metric("Fatturato (4w)", format_euro(tot_sales, 0), delta=d_sales)
+        c2.metric("Spesa Ads (4w)", format_euro(tot_ads, 0), delta=d_ads, delta_color="inverse")
+        c3.metric("MER / BE", f"{format_num_eu(mer_attuale, 2)} / {format_num_eu(be_roas_val, 2)}", delta=f"{format_num_eu(mer_attuale-be_roas_val, 2)} (vs BE)")
+        c4.metric("CoS (Spesa/Ricavi)", f"{format_num_eu(cos, 1)}%", delta=d_cos, delta_color="inverse")
+        c5.metric("Profitto Stimato", format_euro(profit, 0), delta=d_profit, help="Profitto Operativo netto stimato.")
 
         # --- 🌐 ANALISI DEL CONTESTO (INTELLIGENT INSIGHTS) ---
         with st.expander("🌐 Analisi del Contesto: Perché questo andamento?"):
@@ -1128,7 +1191,7 @@ if df is not None:
                 p_total = df_prophet['yhat'].sum()
                 ensemble_total = (rf_total + p_total) / 2
                 
-                st.metric("Fatturato Totale Previsto (Ensemble)", f"€ {ensemble_total:,.0f}", 
+                st.metric("Fatturato Totale Previsto (Ensemble)", format_euro(ensemble_total, 0), 
                           help="Questa è la media ponderata tra l'impatto del budget e la stagionalità. È il dato più affidabile per pianificare il cashflow.")
                 
                 st.divider()
@@ -1402,9 +1465,9 @@ if df is not None:
 
                         st.markdown("---")
                         res_c1, res_c2, res_c3 = st.columns(3)
-                        res_c1.metric("Previsione RF", f"€ {rf_pred:,.2f}")
-                        res_c2.metric("Previsione Prophet", f"€ {p_pred:,.2f}")
-                        res_c3.metric("Media Ensemble", f"€ {avg_pred:,.2f}", delta="Target AI")
+                        res_c1.metric("Previsione RF", format_euro(rf_pred, 2))
+                        res_c2.metric("Previsione Prophet", format_euro(p_pred, 2))
+                        res_c3.metric("Media Ensemble", format_euro(avg_pred, 2), delta="Target AI")
                         
                         if test_actual > 0:
                             error = abs(avg_pred - test_actual) / test_actual
@@ -1430,7 +1493,7 @@ if df is not None:
             st.subheader("🔵 Performance Google Ads")
             if col_g_val in df.columns:
                 g_metrics = df.tail(4)[[col_google, col_g_val, 'ROAS_Google', col_g_cpc, col_g_imps]].sum()
-                st.columns(5)[0].metric("Spesa (4w)", f"€ {g_metrics[col_google]:,.0f}")
+                st.columns(5)[0].metric("Spesa (4w)", format_euro(g_metrics[col_google], 0))
                 
                 fig_g, ax_g1 = plt.subplots(figsize=(12, 5))
                 ax_g1.bar(df['Data_Interna'], df[col_google], color=DARKEST_BLUE, alpha=0.7, label='Spesa Google')
@@ -1445,7 +1508,7 @@ if df is not None:
             st.subheader("🔵 Performance Meta Ads")
             if col_m_val in df.columns:
                 m_metrics = df.tail(4)[[col_meta, col_m_val, 'ROAS_Meta', col_m_cpc, col_m_cpm, col_m_freq]].sum()
-                st.columns(6)[0].metric("Spesa (4w)", f"€ {m_metrics[col_meta]:,.0f}")
+                st.columns(6)[0].metric("Spesa (4w)", format_euro(m_metrics[col_meta], 0))
                 
                 fig_m, ax_m1 = plt.subplots(figsize=(12, 5))
                 ax_m1.bar(df['Data_Interna'], df[col_meta], color=DARKEST_BLUE, alpha=0.7, label='Spesa Meta')
@@ -1770,7 +1833,7 @@ if df is not None:
                 """)
             
             with col_rec2:
-                st.metric("Target Budget Prossime 4w", f"€ {max_safe_budget * (rec_scale/1.1):,.0f}")
+                st.metric("Target Budget Prossime 4w", format_euro(max_safe_budget * (rec_scale/1.1), 0))
                 st.caption("Budget totale stimato per mantenere il profitto operativo.")
 
             st.divider()
@@ -1964,15 +2027,15 @@ Saturazione:   {rec_sat:.2f}
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     delta_sales = ((mt['sales'] - mc['sales']) / mc['sales'] * 100) if mc['sales'] > 0 else 0
-                    st.metric("Fatturato", f"€ {mt['sales']:,.0f}", f"{delta_sales:+.1f}%", help="Somma totale del Fatturato Netto nel periodo selezionato. Rappresenta il volume d'affari lordo al netto di IVA.")
+                    st.metric("Fatturato", format_euro(mt['sales'], 0), format_num_eu(delta_sales, 1, delta=True) + "%", help="Somma totale del Fatturato Netto nel periodo selezionato. Rappresenta il volume d'affari lordo al netto di IVA.")
                 with c2:
-                    st.metric("ROAS (MER)", f"{mt['mer']:.2f}", f"{(mt['mer'] - mc['mer']):+.2f}", help="Marketing Efficiency Ratio. Calcolato come Fatturato Totale / Spesa Ads Totale. Indica l'efficienza globale di ogni euro investito in pubblicità.")
+                    st.metric("ROAS (MER)", format_num_eu(mt['mer'], 2), format_num_eu(mt['mer'] - mc['mer'], 2, delta=True), help="Marketing Efficiency Ratio. Calcolato come Fatturato Totale / Spesa Ads Totale. Indica l'efficienza globale di ogni euro investito in pubblicità.")
                 with c3:
                     delta_cpa = ((mt['cpa'] - mc['cpa']) / mc['cpa'] * 100) if mc['cpa'] > 0 else 0
-                    st.metric("CPA Medio", f"€ {mt['cpa']:.2f}", f"{delta_cpa:+.1f}%", delta_color="inverse", help="Costo Per Acquisizione. Calcolato come Spesa Ads Totale / Numero Ordini. Indica quanto paghi in media per ottenere una vendita.")
+                    st.metric("CPA Medio", format_euro(mt['cpa'], 2), format_num_eu(delta_cpa, 1, delta=True) + "%", delta_color="inverse", help="Costo Per Acquisizione. Calcolato come Spesa Ads Totale / Numero Ordini. Indica quanto paghi in media per ottenere una vendita.")
                 with c4:
                     delta_aov = ((mt['aov'] - mc['aov']) / mc['aov'] * 100) if mc['aov'] > 0 else 0
-                    st.metric("Carrello Medio (AOV)", f"€ {mt['aov']:.2f}", f"{delta_aov:+.1f}%", help="Average Order Value. Fatturato Totale / Numero Ordini. Indica la spesa media di un cliente per singolo acquisto.")
+                    st.metric("Carrello Medio (AOV)", format_euro(mt['aov'], 2), format_num_eu(delta_aov, 1, delta=True) + "%", help="Average Order Value. Fatturato Totale / Numero Ordini. Indica la spesa media di un cliente per singolo acquisto.")
 
                 st.divider()
 
@@ -1981,22 +2044,22 @@ Saturazione:   {rec_sat:.2f}
                 ct1, ct2, ct3, ct4 = st.columns(4)
                 with ct1:
                     delta_cpm = ((mt['cpm_m'] - mc['cpm_m']) / mc['cpm_m'] * 100) if mc['cpm_m'] > 0 else 0
-                    st.metric("CPM Meta", f"€ {mt['cpm_m']:.2f}", f"{delta_cpm:+.1f}%", delta_color="inverse", help="Cost Per Mille. Costo medio pagato su Meta per 1.000 visualizzazioni dell'annuncio.")
+                    st.metric("CPM Meta", format_euro(mt['cpm_m'], 2), format_num_eu(delta_cpm, 1, delta=True) + "%", delta_color="inverse", help="Cost Per Mille. Costo medio pagato su Meta per 1.000 visualizzazioni dell'annuncio.")
                 with ct2:
                     delta_freq = mt['freq_m'] - mc['freq_m']
-                    st.metric("Frequency Meta", f"{mt['freq_m']:.2f}", f"{delta_freq:+.2f}", help="Frequenza media. Indica quante volte mediamente una persona ha visto i tuoi annunci su Meta. Un valore troppo alto (sopra 3-4) può indicare saturazione del pubblico.")
+                    st.metric("Frequency Meta", format_num_eu(mt['freq_m'], 2), format_num_eu(delta_freq, 2, delta=True), help="Frequenza media. Indica quante volte mediamente una persona ha visto i tuoi annunci su Meta. Un valore troppo alto (sopra 3-4) può indicare saturazione del pubblico.")
                 with ct3:
                     delta_cpc_g = ((mt['cpc_g'] - mc['cpc_g']) / mc['cpc_g'] * 100) if mc['cpc_g'] > 0 else 0
-                    st.metric("CPC Google", f"€ {mt['cpc_g']:.2f}", f"{delta_cpc_g:+.1f}%", delta_color="inverse", help="Cost Per Click. Costo medio pagato per ogni click sui tuoi annunci Google.")
+                    st.metric("CPC Google", format_euro(mt['cpc_g'], 2), format_num_eu(delta_cpc_g, 1, delta=True) + "%", delta_color="inverse", help="Cost Per Click. Costo medio pagato per ogni click sui tuoi annunci Google.")
                 with ct4:
                     delta_imps = ((mt['imps_g'] - mc['imps_g']) / mc['imps_g'] * 100) if mc['imps_g'] > 0 else 0
-                    st.metric("Impression Google", f"{mt['imps_g']:,.0f}", f"{delta_imps:+.1f}%", help="Somma totale delle visualizzazioni ottenute sui posizionamenti Google Ads.")
+                    st.metric("Impression Google", format_num_eu(mt['imps_g'], 0), format_num_eu(delta_imps, 1, delta=True) + "%", help="Somma totale delle visualizzazioni ottenute sui posizionamenti Google Ads.")
 
                 st.info(f"""
                 **Diagnostica Rapida:**
                 * {'🔴 **Meta Saturazione:** La frequenza è aumentata!' if mt['freq_m'] > mc['freq_m'] else '🟢 **Meta Audience:** La frequenza è stabile o in calo.'}
-                * {'🔴 **Costi in ascesa:** Il CPM di Meta è aumentato del ' + f"{delta_cpm:.1f}%" if delta_cpm > 5 else '🟢 **Efficienza Costi:** I costi delle aste sono sotto controllo.'}
-                * {'🔵 **Visibilità Google:** Hai ottenuto il ' + f"{delta_imps:+.1f}%" + ' di impression rispetto al passato.'}
+                * {'🔴 **Costi in ascesa:** Il CPM di Meta è aumentato del ' + format_num_eu(delta_cpm, 1) + '%' if delta_cpm > 5 else '🟢 **Efficienza Costi:** I costi delle aste sono sotto controllo.'}
+                * {'🔵 **Visibilità Google:** Hai ottenuto il ' + format_num_eu(delta_imps, 1, delta=True) + '%' + ' di impression rispetto al passato.'}
                 """)
                 
                 st.divider()
@@ -2007,16 +2070,16 @@ Saturazione:   {rec_sat:.2f}
                 c_op1, c_op2, c_op3, c_op4 = st.columns(4)
                 with c_op1:
                     delta_ret = mt['ret'] - mc['ret']
-                    st.metric("Retention Rate", f"{mt['ret']:.2f}%", f"{delta_ret:+.2f}% (pt)", help="Percentuale di clienti che tornano ad acquistare. Estratto direttamente dalla colonna 'Returning customer rate' del tuo report Shopify.")
+                    st.metric("Retention Rate", f"{format_num_eu(mt['ret'], 2)}%", format_num_eu(delta_ret, 2, delta=True) + "% (pt)", help="Percentuale di clienti che tornano ad acquistare. Estratto direttamente dalla colonna 'Returning customer rate' del tuo report Shopify.")
                 with c_op2:
                     delta_res = mt['returns'] - mc['returns']
-                    st.metric("Incidenza Resi", f"{mt['returns']:.1f}%", f"{delta_res:+.1f}% (pt)", delta_color="inverse", help="Rapporto tra il valore dei resi/rimborsi e il fatturato lordo. Indica la qualità della vendita e della logistica.")
+                    st.metric("Incidenza Resi", f"{format_num_eu(mt['returns'], 1)}%", format_num_eu(delta_res, 1, delta=True) + "% (pt)", delta_color="inverse", help="Rapporto tra il valore dei resi/rimborsi e il fatturato lordo. Indica la qualità della vendita e della logistica.")
                 with c_op3:
                     delta_ltv = ((mt['ltv'] - mc['ltv']) / mc['ltv'] * 100) if mc['ltv'] > 0 else 0
-                    st.metric("LTV Stimato (12m)", f"€ {mt['ltv']:,.2f}", f"{delta_ltv:+.1f}%", help="Lifetime Value Stimato. Calcolato matematicamente come AOV / (1 - Retention Rate). Indica quanto vale mediamente un cliente in un anno.")
+                    st.metric("LTV Stimato (12m)", format_euro(mt['ltv'], 2), format_num_eu(delta_ltv, 1, delta=True) + "%", help="Lifetime Value Stimato. Calcolato matematicamente come AOV / (1 - Retention Rate). Indica quanto vale mediamente un cliente in un anno.")
                 with c_op4:
                     delta_ratio = mt['ltv_cpa'] - mc['ltv_cpa']
-                    st.metric("LTV / CPA Ratio", f"{mt['ltv_cpa']:.2f}", f"{delta_ratio:+.2f}", help="Indice di sostenibilità. Rapporto tra quanto il cliente vale nel tempo (LTV) e quanto costa acquisirlo (CPA). Un valore sopra 3.0 indica eccellente scalabilità.")
+                    st.metric("LTV / CPA Ratio", format_num_eu(mt['ltv_cpa'], 2), format_num_eu(delta_ratio, 2, delta=True), help="Indice di sostenibilità. Rapporto tra quanto il cliente vale nel tempo (LTV) e quanto costa acquisirlo (CPA). Un valore sopra 3.0 indica eccellente scalabilità.")
 
                 st.info(f"""
                 **Analisi Qualitativa & Valore Cliente:**
@@ -2037,13 +2100,13 @@ Saturazione:   {rec_sat:.2f}
                 
                 # Metrics
                 if 'Oil' in risk_data:
-                    col_r1.metric("Brent Oil", f"${risk_data['Oil']['current']:.2f}", f"{risk_data['Oil']['trend_7d']:+.1%}")
+                    col_r1.metric("Brent Oil", format_euro(risk_data['Oil']['current'], 2), f"{risk_data['Oil']['trend_7d']:+.1%}")
                 if 'VIX' in risk_data:
-                    col_r2.metric("Fear Index (VIX)", f"{risk_data['VIX']['current']:.2f}", f"{risk_data['VIX']['trend_7d']:+.1%}", delta_color="inverse")
+                    col_r2.metric("Fear Index (VIX)", format_num_eu(risk_data['VIX']['current'], 2), f"{risk_data['VIX']['trend_7d']:+.1%}", delta_color="inverse")
                 if 'Gold' in risk_data:
-                    col_r3.metric("Gold", f"${risk_data['Gold']['current']:.1f}", f"{risk_data['Gold']['trend_7d']:+.1%}")
+                    col_r3.metric("Gold", format_euro(risk_data['Gold']['current'], 1), f"{risk_data['Gold']['trend_7d']:+.1%}")
                 if 'DXY' in risk_data:
-                    col_r4.metric("Dollar Index", f"{risk_data['DXY']['current']:.2f}", f"{risk_data['DXY']['trend_7d']:+.1%}")
+                    col_r4.metric("Dollar Index", format_num_eu(risk_data['DXY']['current'], 2), f"{risk_data['DXY']['trend_7d']:+.1%}")
                 
                 st.divider()
                 
@@ -2163,10 +2226,10 @@ Saturazione:   {rec_sat:.2f}
                     day_sales = biz_day['Fatturato_Netto'].values[0]
                     day_mer = biz_day['Fatturato_Netto'].values[0] / biz_day['Spesa_Ads_Totale'].values[0] if biz_day['Spesa_Ads_Totale'].values[0] > 0 else 0
                     
-                    cb1.metric("Fatturato Giorno", f"€ {day_sales:,.0f}")
-                    cb2.metric("MER Reale Giorno", f"{day_mer:.2f}")
+                    cb1.metric("Fatturato Giorno", format_euro(day_sales, 0))
+                    cb2.metric("MER Reale Giorno", format_num_eu(day_mer, 2))
                     
-                    st.info(f"💡 **Insight AI:** In questa giornata di {day_weather.loc[day_weather['temp'].idxmin()]['status'] if 'status' in day_weather else 'clima variabile'}, il business ha generato un'efficienza di {day_mer:.2f}. {'Ottima correlazione con il maltempo!' if day_weather['rain'].sum() > 30 else 'Performance guidata da fattori interni (Ads/Promo).'}")
+                    st.info(f"💡 **Insight AI:** In questa giornata di {day_weather.loc[day_weather['temp'].idxmin()]['status'] if 'status' in day_weather else 'clima variabile'}, il business ha generato un'efficienza di {format_num_eu(day_mer, 2)}. {'Ottima correlazione con il maltempo!' if day_weather['rain'].sum() > 30 else 'Performance guidata da fattori interni (Ads/Promo).'}")
             else:
                 st.warning("Caricamento dati meteo in corso o fallito. Verifica la connessione.")
 
@@ -2258,12 +2321,12 @@ Saturazione:   {rec_sat:.2f}
             # Styling della tabella
             st.dataframe(
                 ledger_df.style.format({
-                    'Fatturato': '€ {:,.0f}',
-                    'Spesa Ads': '€ {:,.0f}',
-                    'MER': '{:.2f}',
-                    'Temp Media': '{:.1f}°C',
-                    'Petrolio (Avg)': '${:.2f}',
-                    'VIX (Avg)': '{:.2f}'
+                    'Fatturato': lambda x: format_euro(x, 0),
+                    'Spesa Ads': lambda x: format_euro(x, 0),
+                    'MER': lambda x: format_num_eu(x, 2),
+                    'Temp Media': lambda x: format_num_eu(x, 1) + "°C",
+                    'Petrolio (Avg)': lambda x: format_euro(x, 2),
+                    'VIX (Avg)': lambda x: format_num_eu(x, 2)
                 })
                 .background_gradient(subset=['MER'], cmap='RdYlGn', vmin=monthly_biz['MER'].min(), vmax=monthly_biz['MER'].max())
                 .background_gradient(subset=['Petrolio (Avg)'], cmap='YlOrRd')
