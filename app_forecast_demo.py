@@ -21,7 +21,7 @@ st.set_page_config(page_title="Forecasting Strategico Pro - DEMO", layout="wide"
 st.markdown("""
     <style>
     /* ===== PREMIUM UNIVERSAL STYLING ===== */
-    :root {
+    :root {G
         --glass-bg: rgba(255, 255, 255, 0.03);
         --glass-border: rgba(255, 255, 255, 0.1);
     }
@@ -2158,20 +2158,27 @@ Saturazione:   {rec_sat:.2f}
                 
                 lats = ",".join([str(c[0]) for c in cities.values()])
                 lons = ",".join([str(c[1]) for c in cities.values()])
-                s_str = start_date.strftime('%Y-%m-%d')
-                e_str = end_date.strftime('%Y-%m-%d')
-                
-                # Limitiamo il range per non sovraccaricare l'API (max 6 mesi per test)
-                is_recent = (datetime.now() - end_date).days < 5
-                base_url = "https://api.open-meteo.com/v1/forecast" if is_recent else "https://archive-api.open-meteo.com/v1/archive"
+
+                # Cap end_date a 2 giorni fa (archive API ha un ritardo minimo)
+                # e limita il range a max 2 anni per non sovraccaricare l'API
+                today = datetime.now()
+                end_capped = min(end_date, today - timedelta(days=2))
+                start_capped = max(start_date, today - timedelta(days=730))
+                if end_capped <= start_capped:
+                    return pd.DataFrame()
+
+                s_str = start_capped.strftime('%Y-%m-%d')
+                e_str = end_capped.strftime('%Y-%m-%d')
+                base_url = "https://archive-api.open-meteo.com/v1/archive"
                 url = f"{base_url}?latitude={lats}&longitude={lons}&start_date={s_str}&end_date={e_str}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FBerlin"
-                
+
                 all_days_data = []
                 try:
                     resp = requests.get(url, timeout=16).json()
                     if not isinstance(resp, list): resp = [resp]
-                    
+
                     for i, (city, coords) in enumerate(cities.items()):
+                        if i >= len(resp): continue
                         data = resp[i]
                         if 'daily' in data:
                             for day_idx in range(len(data['daily']['time'])):

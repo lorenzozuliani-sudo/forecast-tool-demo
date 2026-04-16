@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where python *)",
+      "Read(//c/Users/loren/AppData/Local/Programs/Python//**)",
+      "Read(//c/Users/loren/AppData/Roaming/**)",
+      "Bash(pip show *)",
+      "Bash(pip3 show *)",
+      "Bash(/c/Users/loren/AppData/Local/Programs/Python/Python312/python.exe -m pip show streamlit)",
+      "Bash(/c/Users/loren/AppData/Local/Programs/Python/Python312/python.exe -m pip list)",
+      "Bash(/c/Users/loren/AppData/Local/Programs/Python/Python312/python.exe -m pip install -r \"c:/Users/loren/Documents/ProgettiPython/forecast-tool-demo/requirements.txt\")",
+      "Bash(/c/Users/loren/AppData/Local/Programs/Python/Python312/python.exe -m streamlit run app_forecast_demo.py --server.port 8501)",
+      "Bash(echo \"AVVIATO PID=$!\")",
+      "Bash(/c/Users/loren/AppData/Local/Programs/Python/Python312/python.exe -m streamlit run app_forecast_demo.py --server.port 8501 --server.headless true --browser.gatherUsageStats false)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(netstat -ano)"
+    ]
+  }
+}
